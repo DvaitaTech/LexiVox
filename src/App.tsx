@@ -146,9 +146,18 @@ export default function AudioReader() {
       setEpubParser(parser);
       setEpubMetadata(metadata);
       setCurrentFileName(file.name);
-      setSelectedChapter(null);
       
-      toast.success(`Loaded "${metadata.title}" with ${metadata.chapters.length} chapters`);
+      // Auto-load first chapter
+      if (metadata.chapters.length > 0) {
+        const firstChapter = metadata.chapters[0];
+        const chapterText = await parser.getChapterText(firstChapter.href);
+        setText(chapterText);
+        setSelectedChapter(firstChapter.id);
+        toast.success(`Loaded "${metadata.title}" - Starting with: ${firstChapter.label}`);
+      } else {
+        setSelectedChapter(null);
+        toast.success(`Loaded "${metadata.title}" with ${metadata.chapters.length} chapters`);
+      }
     } catch (error) {
       console.error("Failed to load EPUB:", error);
       toast.error("Failed to load EPUB file");
@@ -157,7 +166,7 @@ export default function AudioReader() {
     }
   };
 
-  const handleChapterSelect = async (chapterId: string) => {
+  const handleChapterSelect = async (chapterId: string, autoAdvance = false) => {
     if (!epubParser || !epubMetadata) return;
     
     const chapter = epubMetadata.chapters.find(ch => ch.id === chapterId);
@@ -168,7 +177,19 @@ export default function AudioReader() {
       const chapterText = await epubParser.getChapterText(chapter.href);
       setText(chapterText);
       setSelectedChapter(chapterId);
-      toast.success(`Loaded: ${chapter.label}`);
+      
+      if (autoAdvance) {
+        // Auto-generate and continue playing
+        setStatus("generating");
+        setChunks([]);
+        setCurrentChunkIndex(0);
+        const params = { text: chapterText, voice: selectedVoice, speed };
+        setLastGeneration(params);
+        worker.current?.postMessage(params);
+        toast.success(`Auto-advanced to: ${chapter.label}`);
+      } else {
+        toast.success(`Loaded: ${chapter.label}`);
+      }
     } catch (error) {
       console.error("Failed to load chapter:", error);
       toast.error("Failed to load chapter text");
@@ -381,6 +402,20 @@ export default function AudioReader() {
                           status !== "generating" &&
                           currentChunkIndex === chunks.length - 1
                         ) {
+                          // Check if we should auto-advance to next chapter
+                          if (epubMetadata && selectedChapter) {
+                            const currentChapterIndex = epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter);
+                            const nextChapterIndex = currentChapterIndex + 1;
+                            
+                            if (nextChapterIndex < epubMetadata.chapters.length) {
+                              // Auto-load next chapter
+                              const nextChapter = epubMetadata.chapters[nextChapterIndex];
+                              handleChapterSelect(nextChapter.id, true);
+                              return; // Keep playing
+                            }
+                          }
+                          
+                          // No next chapter or not using EPUB, stop playing
                           setIsPlaying(false);
                           setCurrentChunkIndex(-1);
                         } else {
