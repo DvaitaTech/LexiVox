@@ -43,11 +43,26 @@ export function NavigationSelector({
   const renderSelectItems = () => {
     if (type === "epub") {
       const chapters = items as EpubChapter[];
-      return chapters.map((chapter, index) => (
-        <SelectItem key={chapter.id} value={chapter.id}>
-          {index + 1}. {chapter.label}
-        </SelectItem>
-      ));
+      let topLevelCount = 1;
+      
+      return chapters.map((chapter) => {
+        // Create indentation based on nesting level
+        const indent = "  ".repeat(chapter.level);
+        let prefix = "•";
+        
+        if (chapter.level === 0) {
+          prefix = `${topLevelCount}.`;
+          topLevelCount++;
+        }
+        
+        return (
+          <SelectItem key={chapter.id} value={chapter.id}>
+            <span style={{ fontFamily: 'monospace' }}>
+              {indent}{prefix} {chapter.label}
+            </span>
+          </SelectItem>
+        );
+      });
     } else {
       const pages = items as PdfPage[];
       return pages.map((page) => (

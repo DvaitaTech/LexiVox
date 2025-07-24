@@ -498,7 +498,7 @@ export default function AudioReader() {
               <h1 className="text-5xl font-bold text-gray-900">LexiVox</h1>
             </div>
             <p className="text-gray-500">
-              Transform EPUB books and text into natural speech
+              Transform EPUB books and PDF documents into natural speech
             </p>
           </div>
 

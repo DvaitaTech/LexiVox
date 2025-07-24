@@ -4,6 +4,8 @@ export interface EpubChapter {
   id: string;
   label: string;
   href: string;
+  level: number; // Nesting level (0 = top level, 1 = sub-chapter, etc.)
+  parent?: string; // Parent chapter ID if nested
 }
 
 export interface EpubMetadata {
@@ -24,17 +26,39 @@ export class EpubParser {
     const metadata = await this.book.loaded.metadata;
     const navigation = await this.book.loaded.navigation;
     
-    const chapters: EpubChapter[] = navigation.toc.map((item: { id: string; href: string; label: string }) => ({
-      id: item.id || item.href,
-      label: item.label,
-      href: item.href,
-    }));
+    // Recursively extract all chapters including nested ones
+    const chapters: EpubChapter[] = this.extractChaptersRecursively(navigation.toc, 0);
 
     return {
       title: metadata.title || "Unknown Title",
       creator: metadata.creator || "Unknown Author",
       chapters,
     };
+  }
+
+  private extractChaptersRecursively(tocItems: any[], level: number, parentId?: string): EpubChapter[] {
+    const chapters: EpubChapter[] = [];
+    
+    for (const item of tocItems) {
+      const chapterId = item.id || item.href;
+      
+      // Add current chapter
+      chapters.push({
+        id: chapterId,
+        label: item.label,
+        href: item.href,
+        level,
+        parent: parentId,
+      });
+      
+      // Recursively add sub-chapters if they exist
+      if (item.subitems && item.subitems.length > 0) {
+        const subChapters = this.extractChaptersRecursively(item.subitems, level + 1, chapterId);
+        chapters.push(...subChapters);
+      }
+    }
+    
+    return chapters;
   }
 
   async getChapterText(href: string): Promise<string> {
