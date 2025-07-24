@@ -28,6 +28,7 @@ import { AudioChunk } from "./components/audio-chunk";
 import type { AudioChunkData } from "./components/audio-chunk";
 import { FileUploader } from "./components/file-uploader";
 import { NavigationSelector } from "./components/navigation-selector";
+import { InstallPrompt } from "./components/install-prompt";
 import { EpubParser, type EpubMetadata } from "./utils/epub-parser";
 import { PdfParser, type PdfMetadata } from "./utils/pdf-parser";
 
@@ -798,6 +799,7 @@ export default function AudioReader() {
           },
         }}
       />
+      <InstallPrompt />
     </>
   );
 }
