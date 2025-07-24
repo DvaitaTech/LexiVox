@@ -106,22 +106,17 @@ export default function AudioReader() {
         case "device":
           setDevice(data.device);
           setShowDeviceInfo(true);
-          toast(`Device detected: ${data.device.toUpperCase()}`);
           break;
         case "loading":
           setStatus("loading");
           setLoadingProgress(data.progress || 0);
           setLoadingStage(data.stage || 'downloading');
-          if (data.progress === 0) {
-            toast(`Loading TTS model (${data.device?.toUpperCase() || 'Unknown'})...`);
-          }
           break;
         case "ready":
           setStatus("ready");
           setVoices(data.voices);
           setLoadingProgress(100);
           setGenerationProgress({ current: 0, total: 0 });
-          toast(`Model loaded successfully (${data.device?.toUpperCase()})`);
           
           // Show device info briefly for new users
           if (data.device === 'wasm') {
@@ -129,7 +124,6 @@ export default function AudioReader() {
           }
           break;
         case "model_unloaded":
-          toast.info("Model unloaded to save memory");
           setLoadingProgress(0);
           break;
         case "error":
@@ -1163,6 +1157,7 @@ export default function AudioReader() {
         </div>
       </div>
       <Toaster
+        position="top-right"
         toastOptions={{
           style: {
             fontSize: 16,
