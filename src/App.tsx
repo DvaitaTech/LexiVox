@@ -193,10 +193,10 @@ export default function AudioReader() {
           <div className="text-center mb-4">
             <div className="inline-flex items-center gap-2">
               <AudioWaveform className="size-12 text-blue-500" />
-              <h1 className="text-5xl font-bold text-gray-900">Kokoro Web</h1>
+              <h1 className="text-5xl font-bold text-gray-900">LexiVox</h1>
             </div>
             <p className="text-gray-500">
-              Convert text to natural-sounding speech
+              Transform EPUB books and text into natural speech
             </p>
           </div>
 
