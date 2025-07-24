@@ -590,17 +590,6 @@ export default function AudioReader() {
           </Card>
         </div>
       </div>
-      <div className="fixed bottom-4 text-center w-full">
-        Powered by{" "}
-        <a
-          href="https://huggingface.co/docs/transformers.js"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-500 underline"
-        >
-          🤗 Transformers.js
-        </a>
-      </div>
       <Toaster
         toastOptions={{
           style: {
