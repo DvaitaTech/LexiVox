@@ -40,13 +40,12 @@ import { useMediaSession, useWakeLock } from "./hooks/useMediaSession";
 import { useAudioFocus } from "./hooks/useAudioFocus";
 import { ModelLoadingIndicator } from "./components/model-loading-indicator";
 import { GenerationProgress } from "./components/generation-progress";
-import { DevicePerformanceInfo } from "./components/device-performance-info";
 import { shouldShowSlowWarning, estimateGenerationTime, type DeviceType } from "./utils/performance-estimates";
 import { VersionBadge } from "./components/version-badge";
 
 export default function AudioReader() {
   const [text, setText] = useState(
-    "Kokoro is an open-weight TTS model with 82 million parameters. Despite its lightweight architecture, it delivers comparable quality to larger models while being significantly faster and more cost-efficient. With Apache-licensed weights, Kokoro can be deployed anywhere from production environments to personal projects. It can even run 100% locally in your browser, powered by Transformers.js!",
+    "Welcome to LexiVox, your intelligent reading companion! Transform any text, EPUB book, or PDF document into natural-sounding speech. Upload your favorite books, academic papers, or articles and let LexiVox read them aloud with lifelike voices. Experience hands-free reading with automatic chapter navigation, adjustable playback speed, and seamless segment progression. Perfect for multitasking, accessibility, or simply giving your eyes a rest while staying engaged with your content.",
   );
   const [lastGeneration, setLastGeneration] = useState<{
     text: string;
@@ -69,7 +68,6 @@ export default function AudioReader() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingStage, setLoadingStage] = useState<'downloading' | 'loading' | 'ready'>('downloading');
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
-  const [showDeviceInfo, setShowDeviceInfo] = useState(false);
 
   const worker = useRef<Worker | null>(null);
   const [voices, setVoices] = useState<Voices | null>(null);
@@ -107,7 +105,11 @@ export default function AudioReader() {
       switch (data.status) {
         case "device":
           setDevice(data.device);
-          setShowDeviceInfo(true);
+          if (data.device === 'webgpu') {
+            toast.success("WebGPU acceleration active - faster generation!");
+          } else {
+            toast.info("Using WASM backend - generation will be slower");
+          }
           break;
         case "loading":
           setStatus("loading");
@@ -119,11 +121,6 @@ export default function AudioReader() {
           setVoices(data.voices);
           setLoadingProgress(100);
           setGenerationProgress({ current: 0, total: 0 });
-          
-          // Show device info briefly for new users
-          if (data.device === 'wasm') {
-            setShowDeviceInfo(true);
-          }
           break;
         case "model_unloaded":
           setLoadingProgress(0);
@@ -752,16 +749,6 @@ export default function AudioReader() {
             </div>
           )}
 
-          {/* Device Performance Info */}
-          {showDeviceInfo && device && status === "ready" && (
-            <div className="mb-6">
-              <DevicePerformanceInfo
-                device={device}
-                onDismiss={() => setShowDeviceInfo(false)}
-                showOptimizationTips={device === 'wasm'}
-              />
-            </div>
-          )}
 
           <FileUploader
             onFileSelect={handleFileSelect}
