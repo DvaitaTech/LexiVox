@@ -2,6 +2,8 @@
 
 Transform EPUB books and PDF documents into natural speech directly in your browser! Built with [🤗 Transformers.js](https://huggingface.co/docs/transformers.js) and powered by the Kokoro TTS model.
 
+![LexiVox Interface](./public/image.png)
+
 🔗 **Live Demo**: [https://lexivox.dvaitatech.com/](https://lexivox.dvaitatech.com/)
 
 ## Features
