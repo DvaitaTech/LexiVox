@@ -739,7 +739,7 @@ export default function AudioReader() {
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50/50 p-2 sm:p-4 md:p-12 safe-area-padding">
+      <div className="min-h-screen bg-gray-50/50 p-2 sm:p-4 md:p-12 pb-8 sm:pb-12 safe-area-padding">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-4 sm:mb-6">
             <div className="flex flex-col sm:flex-row items-center gap-3 mb-2 sm:relative">
@@ -837,7 +837,7 @@ export default function AudioReader() {
             />
           )}
 
-          <Card className="shadow-lg">
+          <Card className="shadow-lg mb-8 sm:mb-12 bg-gray-50/50">
             <CardContent>
               {!epubMetadata && !pdfMetadata ? (
                 <div className="relative">
