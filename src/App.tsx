@@ -26,9 +26,10 @@ import type { Voices } from "./components/voice-selector";
 import { SpeedControl } from "./components/speed-control";
 import { AudioChunk } from "./components/audio-chunk";
 import type { AudioChunkData } from "./components/audio-chunk";
-import { EpubUploader } from "./components/epub-uploader";
-import { ChapterSelector } from "./components/chapter-selector";
+import { FileUploader } from "./components/file-uploader";
+import { NavigationSelector } from "./components/navigation-selector";
 import { EpubParser, type EpubMetadata } from "./utils/epub-parser";
+import { PdfParser, type PdfMetadata } from "./utils/pdf-parser";
 
 export default function AudioReader() {
   const [text, setText] = useState(
@@ -56,13 +57,21 @@ export default function AudioReader() {
   const [chunks, setChunks] = useState<AudioChunkData[]>([]);
   const [result, setResult] = useState<Blob | null>(null);
 
+  // File state
+  const [fileType, setFileType] = useState<"epub" | "pdf" | null>(null);
+  const [currentFileName, setCurrentFileName] = useState<string | null>(null);
+  const [isLoadingFile, setIsLoadingFile] = useState(false);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  
   // EPUB state
   const [epubParser, setEpubParser] = useState<EpubParser | null>(null);
   const [epubMetadata, setEpubMetadata] = useState<EpubMetadata | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<string | null>(null);
-  const [currentFileName, setCurrentFileName] = useState<string | null>(null);
-  const [isLoadingEpub, setIsLoadingEpub] = useState(false);
-  const [isLoadingChapter, setIsLoadingChapter] = useState(false);
+  
+  // PDF state
+  const [pdfParser, setPdfParser] = useState<PdfParser | null>(null);
+  const [pdfMetadata, setPdfMetadata] = useState<PdfMetadata | null>(null);
+  const [selectedPage, setSelectedPage] = useState<number | null>(null);
 
   useEffect(() => {
     worker.current ??= new Worker(new URL("./worker.js", import.meta.url), {
@@ -140,33 +149,84 @@ export default function AudioReader() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // EPUB handlers
-  const handleEpubFileSelect = async (file: File) => {
-    setIsLoadingEpub(true);
+  // File handlers
+  const handleFileSelect = async (file: File) => {
+    setIsLoadingFile(true);
+    
     try {
-      const parser = new EpubParser();
-      const metadata = await parser.loadFromFile(file);
-      
-      setEpubParser(parser);
-      setEpubMetadata(metadata);
-      setCurrentFileName(file.name);
-      
-      // Auto-load first chapter
-      if (metadata.chapters.length > 0) {
-        const firstChapter = metadata.chapters[0];
-        const chapterText = await parser.getChapterText(firstChapter.href);
-        setText(chapterText);
-        setSelectedChapter(firstChapter.id);
-        toast.success(`Loaded "${metadata.title}" - Starting with: ${firstChapter.label}`);
+      if (file.type === "application/epub+zip") {
+        await handleEpubFile(file);
+      } else if (file.type === "application/pdf") {
+        await handlePdfFile(file);
       } else {
-        setSelectedChapter(null);
-        toast.success(`Loaded "${metadata.title}" with ${metadata.chapters.length} chapters`);
+        toast.error("Unsupported file type");
       }
     } catch (error) {
-      console.error("Failed to load EPUB:", error);
-      toast.error("Failed to load EPUB file");
+      console.error("Failed to load file:", error);
+      toast.error("Failed to load file");
     } finally {
-      setIsLoadingEpub(false);
+      setIsLoadingFile(false);
+    }
+  };
+
+  const handleEpubFile = async (file: File) => {
+    const parser = new EpubParser();
+    const metadata = await parser.loadFromFile(file);
+    
+    setFileType("epub");
+    setEpubParser(parser);
+    setEpubMetadata(metadata);
+    setCurrentFileName(file.name);
+    
+    // Clear PDF state
+    setPdfParser(null);
+    setPdfMetadata(null);
+    setSelectedPage(null);
+    
+    // Auto-load first chapter
+    if (metadata.chapters.length > 0) {
+      const firstChapter = metadata.chapters[0];
+      const chapterText = await parser.getChapterText(firstChapter.href);
+      setText(chapterText);
+      setSelectedChapter(firstChapter.id);
+      toast.success(`Loaded "${metadata.title}" - Starting with: ${firstChapter.label}`);
+    } else {
+      setSelectedChapter(null);
+      toast.success(`Loaded "${metadata.title}" with ${metadata.chapters.length} chapters`);
+    }
+  };
+
+  const handlePdfFile = async (file: File) => {
+    const parser = new PdfParser();
+    const metadata = await parser.loadFromFile(file);
+    
+    setFileType("pdf");
+    setPdfParser(parser);
+    setPdfMetadata(metadata);
+    setCurrentFileName(file.name);
+    
+    // Clear EPUB state
+    setEpubParser(null);
+    setEpubMetadata(null);
+    setSelectedChapter(null);
+    
+    // Auto-load first page
+    if (metadata.pages.length > 0) {
+      const firstPage = metadata.pages[0];
+      setText(firstPage.text);
+      setSelectedPage(1);
+      toast.success(`Loaded "${metadata.title}" - Starting with Page 1 of ${metadata.totalPages}`);
+    } else {
+      setSelectedPage(null);
+      toast.success(`Loaded "${metadata.title}" with ${metadata.totalPages} pages`);
+    }
+  };
+
+  const handleNavigationSelect = async (itemId: string | number) => {
+    if (fileType === "epub") {
+      await handleChapterSelect(itemId as string);
+    } else if (fileType === "pdf") {
+      await handlePageSelect(itemId as number);
     }
   };
 
@@ -176,7 +236,7 @@ export default function AudioReader() {
     const chapter = epubMetadata.chapters.find(ch => ch.id === chapterId);
     if (!chapter) return;
 
-    setIsLoadingChapter(true);
+    setIsLoadingContent(true);
     try {
       const chapterText = await epubParser.getChapterText(chapter.href);
       setText(chapterText);
@@ -198,17 +258,55 @@ export default function AudioReader() {
       console.error("Failed to load chapter:", error);
       toast.error("Failed to load chapter text");
     } finally {
-      setIsLoadingChapter(false);
+      setIsLoadingContent(false);
     }
   };
 
-  const handleClearEpub = () => {
+  const handlePageSelect = async (pageNumber: number, autoAdvance = false) => {
+    if (!pdfParser || !pdfMetadata) return;
+    
+    const page = pdfMetadata.pages.find(p => p.pageNumber === pageNumber);
+    if (!page) return;
+
+    setIsLoadingContent(true);
+    try {
+      setText(page.text);
+      setSelectedPage(pageNumber);
+      
+      if (autoAdvance) {
+        // Auto-generate and continue playing
+        setStatus("generating");
+        setChunks([]);
+        setCurrentChunkIndex(0);
+        const params = { text: page.text, voice: selectedVoice, speed };
+        setLastGeneration(params);
+        worker.current?.postMessage(params);
+        toast.success(`Auto-advanced to: Page ${pageNumber}`);
+      } else {
+        toast.success(`Loaded: Page ${pageNumber}`);
+      }
+    } catch (error) {
+      console.error("Failed to load page:", error);
+      toast.error("Failed to load page text");
+    } finally {
+      setIsLoadingContent(false);
+    }
+  };
+
+  const handleClearFile = () => {
     epubParser?.destroy();
+    pdfParser?.destroy();
+    
+    setFileType(null);
     setEpubParser(null);
     setEpubMetadata(null);
     setSelectedChapter(null);
+    setPdfParser(null);
+    setPdfMetadata(null);
+    setSelectedPage(null);
     setCurrentFileName(null);
-    toast.info("EPUB cleared");
+    
+    toast.info("File cleared");
   };
 
   // Navigation functions
@@ -236,20 +334,35 @@ export default function AudioReader() {
     }
   };
 
+  const handlePreviousSection = async () => {
+    if (fileType === "epub") {
+      await handlePreviousChapter();
+    } else if (fileType === "pdf") {
+      await handlePreviousPage();
+    }
+  };
+
+  const handleNextSection = async () => {
+    if (fileType === "epub") {
+      await handleNextChapter();
+    } else if (fileType === "pdf") {
+      await handleNextPage();
+    }
+  };
+
   const handlePreviousChapter = async () => {
     if (!epubMetadata || !selectedChapter || !epubParser) return;
     
     const currentChapterIndex = epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter);
     if (currentChapterIndex > 0) {
       const wasPlaying = isPlaying;
-      setIsPlaying(false); // Stop current playback
-      setChunks([]); // Clear existing chunks to prevent conflicts
-      setCurrentChunkIndex(-1); // Reset chunk index
+      setIsPlaying(false);
+      setChunks([]);
+      setCurrentChunkIndex(-1);
       
       const prevChapter = epubMetadata.chapters[currentChapterIndex - 1];
       
-      // Load chapter text directly
-      setIsLoadingChapter(true);
+      setIsLoadingContent(true);
       try {
         const chapterText = await epubParser.getChapterText(prevChapter.href);
         setText(chapterText);
@@ -257,7 +370,6 @@ export default function AudioReader() {
         toast.success(`Loaded: ${prevChapter.label}`);
         
         if (wasPlaying) {
-          // Start playing the new chapter with the correct text
           setTimeout(() => {
             setCurrentChunkIndex(0);
             setIsPlaying(true);
@@ -271,7 +383,7 @@ export default function AudioReader() {
         console.error("Failed to load chapter:", error);
         toast.error("Failed to load chapter text");
       } finally {
-        setIsLoadingChapter(false);
+        setIsLoadingContent(false);
       }
     }
   };
@@ -282,14 +394,13 @@ export default function AudioReader() {
     const currentChapterIndex = epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter);
     if (currentChapterIndex < epubMetadata.chapters.length - 1) {
       const wasPlaying = isPlaying;
-      setIsPlaying(false); // Stop current playback
-      setChunks([]); // Clear existing chunks to prevent conflicts
-      setCurrentChunkIndex(-1); // Reset chunk index
+      setIsPlaying(false);
+      setChunks([]);
+      setCurrentChunkIndex(-1);
       
       const nextChapter = epubMetadata.chapters[currentChapterIndex + 1];
       
-      // Load chapter text directly
-      setIsLoadingChapter(true);
+      setIsLoadingContent(true);
       try {
         const chapterText = await epubParser.getChapterText(nextChapter.href);
         setText(chapterText);
@@ -297,7 +408,6 @@ export default function AudioReader() {
         toast.success(`Loaded: ${nextChapter.label}`);
         
         if (wasPlaying) {
-          // Start playing the new chapter with the correct text
           setTimeout(() => {
             setCurrentChunkIndex(0);
             setIsPlaying(true);
@@ -311,7 +421,69 @@ export default function AudioReader() {
         console.error("Failed to load chapter:", error);
         toast.error("Failed to load chapter text");
       } finally {
-        setIsLoadingChapter(false);
+        setIsLoadingContent(false);
+      }
+    }
+  };
+
+  const handlePreviousPage = async () => {
+    if (!pdfMetadata || !selectedPage) return;
+    
+    if (selectedPage > 1) {
+      const wasPlaying = isPlaying;
+      setIsPlaying(false);
+      setChunks([]);
+      setCurrentChunkIndex(-1);
+      
+      const prevPageNumber = selectedPage - 1;
+      const prevPage = pdfMetadata.pages.find(p => p.pageNumber === prevPageNumber);
+      
+      if (prevPage) {
+        setText(prevPage.text);
+        setSelectedPage(prevPageNumber);
+        toast.success(`Loaded: Page ${prevPageNumber}`);
+        
+        if (wasPlaying) {
+          setTimeout(() => {
+            setCurrentChunkIndex(0);
+            setIsPlaying(true);
+            const params = { text: prevPage.text, voice: selectedVoice, speed };
+            setLastGeneration(params);
+            setStatus("generating");
+            worker.current?.postMessage(params);
+          }, 200);
+        }
+      }
+    }
+  };
+
+  const handleNextPage = async () => {
+    if (!pdfMetadata || !selectedPage) return;
+    
+    if (selectedPage < pdfMetadata.totalPages) {
+      const wasPlaying = isPlaying;
+      setIsPlaying(false);
+      setChunks([]);
+      setCurrentChunkIndex(-1);
+      
+      const nextPageNumber = selectedPage + 1;
+      const nextPage = pdfMetadata.pages.find(p => p.pageNumber === nextPageNumber);
+      
+      if (nextPage) {
+        setText(nextPage.text);
+        setSelectedPage(nextPageNumber);
+        toast.success(`Loaded: Page ${nextPageNumber}`);
+        
+        if (wasPlaying) {
+          setTimeout(() => {
+            setCurrentChunkIndex(0);
+            setIsPlaying(true);
+            const params = { text: nextPage.text, voice: selectedVoice, speed };
+            setLastGeneration(params);
+            setStatus("generating");
+            worker.current?.postMessage(params);
+          }, 200);
+        }
       }
     }
   };
@@ -330,25 +502,26 @@ export default function AudioReader() {
             </p>
           </div>
 
-          <EpubUploader
-            onFileSelect={handleEpubFileSelect}
-            isLoading={isLoadingEpub}
+          <FileUploader
+            onFileSelect={handleFileSelect}
+            isLoading={isLoadingFile}
             currentFile={currentFileName}
-            onClear={handleClearEpub}
+            onClear={handleClearFile}
           />
 
-          {epubMetadata && (
-            <ChapterSelector
-              chapters={epubMetadata.chapters}
-              selectedChapter={selectedChapter}
-              onChapterSelect={handleChapterSelect}
-              isLoading={isLoadingChapter}
+          {(epubMetadata || pdfMetadata) && (
+            <NavigationSelector
+              type={fileType!}
+              items={fileType === "epub" ? epubMetadata!.chapters : pdfMetadata!.pages}
+              selectedItem={fileType === "epub" ? selectedChapter : selectedPage}
+              onItemSelect={handleNavigationSelect}
+              isLoading={isLoadingContent}
             />
           )}
 
           <Card className="shadow-lg">
             <CardContent>
-              {!epubMetadata ? (
+              {!epubMetadata && !pdfMetadata ? (
                 <div className="relative">
                   <Textarea
                     value={text}
@@ -373,7 +546,9 @@ export default function AudioReader() {
                 <div className="relative">
                   <div className="p-4 bg-gray-50 rounded-lg border">
                     <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-semibold text-lg">{epubMetadata.title}</h3>
+                      <h3 className="font-semibold text-lg">
+                        {fileType === "epub" ? epubMetadata!.title : pdfMetadata!.title}
+                      </h3>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -387,12 +562,18 @@ export default function AudioReader() {
                         )}
                       </Button>
                     </div>
-                    {selectedChapter ? (
+                    {fileType === "epub" && selectedChapter ? (
                       <div className="text-sm text-gray-600 mb-3">
-                        Current chapter: {epubMetadata.chapters.find(ch => ch.id === selectedChapter)?.label}
+                        Current chapter: {epubMetadata!.chapters.find(ch => ch.id === selectedChapter)?.label}
+                      </div>
+                    ) : fileType === "pdf" && selectedPage ? (
+                      <div className="text-sm text-gray-600 mb-3">
+                        Current page: Page {selectedPage} of {pdfMetadata!.totalPages}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-500 mb-3">Select a chapter to load text</div>
+                      <div className="text-sm text-gray-500 mb-3">
+                        Select a {fileType === "epub" ? "chapter" : "page"} to load text
+                      </div>
                     )}
                   </div>
                 </div>
@@ -439,15 +620,21 @@ export default function AudioReader() {
               {/* Media Player Controls */}
               <div className="py-6">
                 <div className="flex items-center justify-center gap-2 mb-4">
-                  {/* Chapter Navigation */}
+                  {/* Section Navigation */}
                   <Button
                     size="lg"
                     variant="ghost"
-                    onClick={handlePreviousChapter}
+                    onClick={handlePreviousSection}
                     disabled={
-                      !epubMetadata || 
-                      !selectedChapter || 
-                      epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter) === 0
+                      fileType === "epub" ? (
+                        !epubMetadata || 
+                        !selectedChapter || 
+                        epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter) === 0
+                      ) : fileType === "pdf" ? (
+                        !pdfMetadata || 
+                        !selectedPage || 
+                        selectedPage === 1
+                      ) : true
                     }
                     className="h-12 w-12"
                   >
@@ -496,15 +683,21 @@ export default function AudioReader() {
                     <SkipForward className="size-5" />
                   </Button>
 
-                  {/* Chapter Navigation */}
+                  {/* Section Navigation */}
                   <Button
                     size="lg"
                     variant="ghost"
-                    onClick={handleNextChapter}
+                    onClick={handleNextSection}
                     disabled={
-                      !epubMetadata || 
-                      !selectedChapter || 
-                      epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter) === epubMetadata.chapters.length - 1
+                      fileType === "epub" ? (
+                        !epubMetadata || 
+                        !selectedChapter || 
+                        epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter) === epubMetadata.chapters.length - 1
+                      ) : fileType === "pdf" ? (
+                        !pdfMetadata || 
+                        !selectedPage || 
+                        selectedPage === pdfMetadata.totalPages
+                      ) : true
                     }
                     className="h-12 w-12"
                   >
@@ -561,8 +754,8 @@ export default function AudioReader() {
                           status !== "generating" &&
                           currentChunkIndex === chunks.length - 1
                         ) {
-                          // Check if we should auto-advance to next chapter
-                          if (epubMetadata && selectedChapter) {
+                          // Check if we should auto-advance to next section
+                          if (fileType === "epub" && epubMetadata && selectedChapter) {
                             const currentChapterIndex = epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter);
                             const nextChapterIndex = currentChapterIndex + 1;
                             
@@ -572,9 +765,17 @@ export default function AudioReader() {
                               handleChapterSelect(nextChapter.id, true);
                               return; // Keep playing
                             }
+                          } else if (fileType === "pdf" && pdfMetadata && selectedPage) {
+                            const nextPageNumber = selectedPage + 1;
+                            
+                            if (nextPageNumber <= pdfMetadata.totalPages) {
+                              // Auto-load next page
+                              handlePageSelect(nextPageNumber, true);
+                              return; // Keep playing
+                            }
                           }
                           
-                          // No next chapter or not using EPUB, stop playing
+                          // No next section or not using file, stop playing
                           setIsPlaying(false);
                           setCurrentChunkIndex(-1);
                         } else {
