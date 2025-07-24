@@ -31,8 +31,10 @@ import { FileUploader } from "./components/file-uploader";
 import { NavigationSelector } from "./components/navigation-selector";
 import { InstallPrompt } from "./components/install-prompt";
 import { InstallButton } from "./components/install-button";
-import { EpubParser, type EpubMetadata } from "./utils/epub-parser";
-import { PdfParser, type PdfMetadata } from "./utils/pdf-parser";
+import type { EpubMetadata } from "./utils/epub-parser";
+import type { PdfMetadata } from "./utils/pdf-parser";
+import { useNavigationSwipe } from "./hooks/useSwipeGesture";
+import { isMobile } from "./utils/mobile-detection";
 
 export default function AudioReader() {
   const [text, setText] = useState(
@@ -67,12 +69,12 @@ export default function AudioReader() {
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   
   // EPUB state
-  const [epubParser, setEpubParser] = useState<EpubParser | null>(null);
+  const [epubParser, setEpubParser] = useState<any | null>(null);
   const [epubMetadata, setEpubMetadata] = useState<EpubMetadata | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<string | null>(null);
   
   // PDF state
-  const [pdfParser, setPdfParser] = useState<PdfParser | null>(null);
+  const [pdfParser, setPdfParser] = useState<any | null>(null);
   const [pdfMetadata, setPdfMetadata] = useState<PdfMetadata | null>(null);
   const [selectedPage, setSelectedPage] = useState<number | null>(null);
 
@@ -88,10 +90,18 @@ export default function AudioReader() {
         case "device":
           toast("Device detected: " + data.device);
           break;
+        case "loading":
+          setStatus("loading");
+          toast("Loading TTS model...");
+          break;
         case "ready":
           toast("Model loaded successfully");
           setStatus("ready");
           setVoices(data.voices);
+          break;
+        case "model_unloaded":
+          toast.info("Model unloaded to save memory");
+          // Don't change status - model will reload automatically when needed
           break;
         case "error":
           setStatus("error");
@@ -173,6 +183,8 @@ export default function AudioReader() {
   };
 
   const handleEpubFile = async (file: File) => {
+    // Lazy load EPUB parser
+    const { EpubParser } = await import("./utils/epub-parser");
     const parser = new EpubParser();
     const metadata = await parser.loadFromFile(file);
     
@@ -200,6 +212,8 @@ export default function AudioReader() {
   };
 
   const handlePdfFile = async (file: File) => {
+    // Lazy load PDF parser
+    const { PdfParser } = await import("./utils/pdf-parser");
     const parser = new PdfParser();
     const metadata = await parser.loadFromFile(file);
     
@@ -491,9 +505,17 @@ export default function AudioReader() {
     }
   };
 
+  // Add swipe gesture support on mobile
+  const swipeEnabled = isMobile() && (fileType === "epub" || fileType === "pdf");
+  const { swiping } = useNavigationSwipe(
+    handleNextSection,
+    handlePreviousSection,
+    swipeEnabled
+  );
+
   return (
     <>
-      <div className="min-h-screen bg-gray-50/50 p-2 sm:p-4 md:p-12">
+      <div className="min-h-screen bg-gray-50/50 p-2 sm:p-4 md:p-12 safe-area-padding">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-4 sm:mb-6">
             <div className="flex flex-col sm:flex-row items-center gap-3 mb-2 sm:relative">

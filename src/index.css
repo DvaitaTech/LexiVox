@@ -143,3 +143,54 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile-specific utilities */
+@layer utilities {
+  /* Ensure minimum touch target size on mobile */
+  @media (max-width: 640px) {
+    .touch-manipulation {
+      min-height: 44px !important;
+      min-width: 44px !important;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Increase button padding on mobile */
+    button.touch-manipulation {
+      @apply px-4 py-3;
+    }
+    
+    /* Larger clickable areas for icons */
+    button.touch-manipulation[data-size="icon"] {
+      @apply h-11 w-11;
+    }
+  }
+  
+  /* Prevent text selection on interactive elements */
+  .touch-manipulation {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  
+  /* Optimize for smooth scrolling */
+  .smooth-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Safe area padding for notched devices */
+  .safe-area-padding {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  /* Reduce motion for battery saving */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

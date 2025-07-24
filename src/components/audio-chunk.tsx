@@ -81,6 +81,13 @@ export const AudioChunk = memo(function AudioChunk({
 
   const url = useMemo(() => URL.createObjectURL(audio), [audio]);
 
+  // Clean up blob URL when component unmounts or audio changes
+  useEffect(() => {
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [url]);
+
   return (
     <div
       {...props}
