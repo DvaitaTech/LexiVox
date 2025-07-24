@@ -22,6 +22,9 @@ import type { Voices } from "./components/voice-selector";
 import { SpeedControl } from "./components/speed-control";
 import { AudioChunk } from "./components/audio-chunk";
 import type { AudioChunkData } from "./components/audio-chunk";
+import { EpubUploader } from "./components/epub-uploader";
+import { ChapterSelector } from "./components/chapter-selector";
+import { EpubParser, type EpubMetadata } from "./utils/epub-parser";
 
 export default function AudioReader() {
   const [text, setText] = useState(
@@ -48,6 +51,14 @@ export default function AudioReader() {
   const [selectedVoice, setSelectedVoice] = useState<keyof Voices>("af_heart");
   const [chunks, setChunks] = useState<AudioChunkData[]>([]);
   const [result, setResult] = useState<Blob | null>(null);
+
+  // EPUB state
+  const [epubParser, setEpubParser] = useState<EpubParser | null>(null);
+  const [epubMetadata, setEpubMetadata] = useState<EpubMetadata | null>(null);
+  const [selectedChapter, setSelectedChapter] = useState<string | null>(null);
+  const [currentFileName, setCurrentFileName] = useState<string | null>(null);
+  const [isLoadingEpub, setIsLoadingEpub] = useState(false);
+  const [isLoadingChapter, setIsLoadingChapter] = useState(false);
 
   useEffect(() => {
     worker.current ??= new Worker(new URL("./worker.js", import.meta.url), {
@@ -125,6 +136,56 @@ export default function AudioReader() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // EPUB handlers
+  const handleEpubFileSelect = async (file: File) => {
+    setIsLoadingEpub(true);
+    try {
+      const parser = new EpubParser();
+      const metadata = await parser.loadFromFile(file);
+      
+      setEpubParser(parser);
+      setEpubMetadata(metadata);
+      setCurrentFileName(file.name);
+      setSelectedChapter(null);
+      
+      toast.success(`Loaded "${metadata.title}" with ${metadata.chapters.length} chapters`);
+    } catch (error) {
+      console.error("Failed to load EPUB:", error);
+      toast.error("Failed to load EPUB file");
+    } finally {
+      setIsLoadingEpub(false);
+    }
+  };
+
+  const handleChapterSelect = async (chapterId: string) => {
+    if (!epubParser || !epubMetadata) return;
+    
+    const chapter = epubMetadata.chapters.find(ch => ch.id === chapterId);
+    if (!chapter) return;
+
+    setIsLoadingChapter(true);
+    try {
+      const chapterText = await epubParser.getChapterText(chapter.href);
+      setText(chapterText);
+      setSelectedChapter(chapterId);
+      toast.success(`Loaded: ${chapter.label}`);
+    } catch (error) {
+      console.error("Failed to load chapter:", error);
+      toast.error("Failed to load chapter text");
+    } finally {
+      setIsLoadingChapter(false);
+    }
+  };
+
+  const handleClearEpub = () => {
+    epubParser?.destroy();
+    setEpubParser(null);
+    setEpubMetadata(null);
+    setSelectedChapter(null);
+    setCurrentFileName(null);
+    toast.info("EPUB cleared");
+  };
+
   return (
     <>
       <div className="min-h-screen bg-gray-50/50 p-4 md:p-12">
@@ -138,6 +199,22 @@ export default function AudioReader() {
               Convert text to natural-sounding speech
             </p>
           </div>
+
+          <EpubUploader
+            onFileSelect={handleEpubFileSelect}
+            isLoading={isLoadingEpub}
+            currentFile={currentFileName}
+            onClear={handleClearEpub}
+          />
+
+          {epubMetadata && (
+            <ChapterSelector
+              chapters={epubMetadata.chapters}
+              selectedChapter={selectedChapter}
+              onChapterSelect={handleChapterSelect}
+              isLoading={isLoadingChapter}
+            />
+          )}
 
           <Card className="shadow-lg">
             <CardContent>
