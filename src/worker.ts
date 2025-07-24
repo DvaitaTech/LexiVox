@@ -15,19 +15,62 @@ self.postMessage({ status: "device", device });
 async function loadModel() {
   if (tts) return tts; // Model already loaded
   
-  self.postMessage({ status: "loading" });
-  
-  tts = await KokoroTTS.from_pretrained(model_id, {
-    dtype: device === "wasm" ? "q8" : "fp32",
+  self.postMessage({ 
+    status: "loading", 
     device,
-  }).catch((e: Error) => {
-    self.postMessage({ status: "error", error: e.message });
-    throw e;
+    stage: "downloading",
+    progress: 0
   });
   
-  self.postMessage({ status: "ready", voices: tts.voices, device });
-  resetIdleTimer();
-  return tts;
+  try {
+    // Create progress tracking wrapper
+    let lastProgress = 0;
+    const progressInterval = setInterval(() => {
+      // Simulate progress during download (rough estimate)
+      lastProgress = Math.min(90, lastProgress + Math.random() * 10);
+      self.postMessage({ 
+        status: "loading", 
+        device,
+        stage: "downloading",
+        progress: lastProgress
+      });
+    }, 500);
+
+    tts = await KokoroTTS.from_pretrained(model_id, {
+      dtype: device === "wasm" ? "q8" : "fp32",
+      device,
+    });
+    
+    clearInterval(progressInterval);
+    
+    // Final loading stage
+    self.postMessage({ 
+      status: "loading", 
+      device,
+      stage: "ready",
+      progress: 100
+    });
+    
+    // Brief delay to show completion
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    self.postMessage({ 
+      status: "ready", 
+      voices: tts.voices, 
+      device,
+      performance: {
+        chunksPerSecond: device === "wasm" ? 0.25 : 0.8,
+        averageChunkTime: device === "wasm" ? 4000 : 1250
+      }
+    });
+    
+    resetIdleTimer();
+    return tts;
+    
+  } catch (e: Error) {
+    self.postMessage({ status: "error", error: e.message, device });
+    throw e;
+  }
 }
 
 // Function to unload the model
@@ -71,13 +114,24 @@ self.addEventListener("message", async (e) => {
   const stream = model.stream(streamer, { voice, speed });
 
   const chunks = [];
+  let chunkIndex = 0;
+  
   for await (const { text, audio } of stream) {
+    chunkIndex++;
+    
     self.postMessage({
       status: "stream",
       chunk: {
         audio: audio.toBlob(),
         text,
       },
+      progress: {
+        current: chunkIndex,
+        // We don't know total chunks ahead of time, so we'll estimate
+        // based on text length (rough: 75 chars per chunk)
+        estimatedTotal: Math.ceil(text.length / 75),
+        device
+      }
     });
     chunks.push(audio);
     resetIdleTimer(); // Keep resetting timer during generation

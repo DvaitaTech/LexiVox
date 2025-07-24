@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LexiVox (internally "Kokoro Web") is a Progressive Web Application (PWA) for browser-based text-to-speech built with React 19 + TypeScript + Vite. It uses the Kokoro TTS model (82M parameters) running entirely in the browser via Transformers.js, supporting both WebGPU and WASM backends for ML inference. The app supports document reading from EPUB and PDF files with chapter/page navigation.
+LexiVox is a mobile-first Progressive Web Application (PWA) for browser-based text-to-speech built with React 19 + TypeScript + Vite. It uses the Kokoro TTS model (82M parameters) running entirely in the browser via Transformers.js, supporting both WebGPU and WASM backends for ML inference. The app supports document reading from EPUB and PDF files with chapter/page navigation, background playback, and comprehensive mobile optimizations.
 
 ## Development Commands
 
@@ -42,11 +42,11 @@ LexiVox (internally "Kokoro Web") is a Progressive Web Application (PWA) for bro
 ### File Structure
 - `src/components/ui/` - shadcn/ui components (30+ reusable UI primitives)
 - `src/components/` - App-specific components (audio-chunk, file-uploader, voice-selector, etc.)
-- `src/utils/` - Utility modules (epub-parser, pdf-parser, create-icons)
-- `src/hooks/` - Custom React hooks
+- `src/utils/` - Utility modules (epub-parser, pdf-parser, mobile-detection, create-icons)
+- `src/hooks/` - Custom React hooks (media session, audio focus, swipe gestures, memory cleanup)
 - `src/types/` - TypeScript type definitions
 - `src/lib/utils.ts` - Core utilities (cn for className merging)
-- `public/` - PWA icons and static assets
+- `public/` - PWA icons, social media images, and static assets
 
 ## Configuration
 - **Vite config** - Tailwind v4 plugin, React plugin, PWA plugin, path aliases (@/ -> src/)
@@ -66,8 +66,29 @@ LexiVox (internally "Kokoro Web") is a Progressive Web Application (PWA) for bro
 - **TTS Processing** - Isolated in worker.ts to prevent main thread blocking
 - **Backend Detection** - Automatic WebGPU/WASM fallback based on browser capabilities
 - **Streaming Audio** - Real-time audio chunk generation and playback
-- **Model Loading** - Kokoro TTS model loaded on-demand in worker context
+- **Model Loading** - Kokoro TTS model loaded on-demand with idle timer (5min timeout)
+- **Memory Management** - Automatic model unloading and lazy parser loading
+
+## Mobile Optimizations
+- **Memory Management** - Sliding window audio chunk cleanup and model idle unloading
+- **Touch UI** - 44px minimum touch targets with optimized mobile controls
+- **Gesture Support** - Swipe left/right for chapter/page navigation
+- **Performance** - Lazy loading of EPUB/PDF parsers, reduced motion support
+- **Device Detection** - Mobile-specific features via mobile-detection utility
+
+## Background Playback Features
+- **Media Session API** - Lock screen controls with chapter/page metadata
+- **Audio Focus** - Handles interruptions (calls, other apps) gracefully
+- **Wake Lock** - Prevents screen sleep during playback
+- **Background Audio** - Continues playing when app is backgrounded
+
+## Caching Strategy
+- **Model Files** - TTS model cached for 30 days (100MB limit)
+- **Audio Blobs** - Generated audio cached for 1 week
+- **Documents** - EPUB/PDF files cached for 30 days
+- **Fonts & Assets** - Standard web assets with appropriate TTL
 
 ## Testing
 - **No formal testing framework configured** - Consider adding Vitest or Jest for future development
 - Manual testing via `npm run dev` and browser testing tools
+- Mobile testing recommended on actual devices for gesture and background features

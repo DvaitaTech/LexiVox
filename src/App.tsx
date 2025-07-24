@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Github,
+  Cpu,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -37,6 +38,10 @@ import { useNavigationSwipe } from "./hooks/useSwipeGesture";
 import { isMobile } from "./utils/mobile-detection";
 import { useMediaSession, useWakeLock } from "./hooks/useMediaSession";
 import { useAudioFocus } from "./hooks/useAudioFocus";
+import { ModelLoadingIndicator } from "./components/model-loading-indicator";
+import { GenerationProgress } from "./components/generation-progress";
+import { DevicePerformanceInfo } from "./components/device-performance-info";
+import { shouldShowSlowWarning, estimateGenerationTime, type DeviceType } from "./utils/performance-estimates";
 
 export default function AudioReader() {
   const [text, setText] = useState(
@@ -57,6 +62,13 @@ export default function AudioReader() {
     "loading" | "ready" | "generating" | "error"
   >("loading");
   const [error, setError] = useState<string | null>(null);
+  
+  // Enhanced loading states
+  const [device, setDevice] = useState<DeviceType | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStage, setLoadingStage] = useState<'downloading' | 'loading' | 'ready'>('downloading');
+  const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
+  const [showDeviceInfo, setShowDeviceInfo] = useState(false);
 
   const worker = useRef<Worker | null>(null);
   const [voices, setVoices] = useState<Voices | null>(null);
@@ -90,32 +102,55 @@ export default function AudioReader() {
     const onMessageReceived = ({ data }) => {
       switch (data.status) {
         case "device":
-          toast("Device detected: " + data.device);
+          setDevice(data.device);
+          setShowDeviceInfo(true);
+          toast(`Device detected: ${data.device.toUpperCase()}`);
           break;
         case "loading":
           setStatus("loading");
-          toast("Loading TTS model...");
+          setLoadingProgress(data.progress || 0);
+          setLoadingStage(data.stage || 'downloading');
+          if (data.progress === 0) {
+            toast(`Loading TTS model (${data.device?.toUpperCase() || 'Unknown'})...`);
+          }
           break;
         case "ready":
-          toast("Model loaded successfully");
           setStatus("ready");
           setVoices(data.voices);
+          setLoadingProgress(100);
+          setGenerationProgress({ current: 0, total: 0 });
+          toast(`Model loaded successfully (${data.device?.toUpperCase()})`);
+          
+          // Show device info briefly for new users
+          if (data.device === 'wasm') {
+            setShowDeviceInfo(true);
+          }
           break;
         case "model_unloaded":
           toast.info("Model unloaded to save memory");
-          // Don't change status - model will reload automatically when needed
+          setLoadingProgress(0);
           break;
         case "error":
           setStatus("error");
-          setError(data.data);
+          setError(data.error || data.data);
+          setLoadingProgress(0);
           break;
         case "stream": {
           setChunks((prev) => [...prev, data.chunk]);
+          
+          // Update generation progress
+          if (data.progress) {
+            setGenerationProgress({
+              current: data.progress.current,
+              total: data.progress.estimatedTotal
+            });
+          }
           break;
         }
         case "complete": {
           setStatus("ready");
           setResult(data.audio);
+          setGenerationProgress({ current: 0, total: 0 });
           break;
         }
       }
@@ -660,6 +695,29 @@ export default function AudioReader() {
             </p>
           </div>
 
+          {/* Model Loading Indicator */}
+          {status === "loading" && (
+            <div className="mb-6">
+              <ModelLoadingIndicator
+                isLoading={true}
+                device={device || undefined}
+                progress={loadingProgress}
+                stage={loadingStage}
+              />
+            </div>
+          )}
+
+          {/* Device Performance Info */}
+          {showDeviceInfo && device && status === "ready" && (
+            <div className="mb-6">
+              <DevicePerformanceInfo
+                device={device}
+                onDismiss={() => setShowDeviceInfo(false)}
+                showOptimizationTips={device === 'wasm'}
+              />
+            </div>
+          )}
+
           <FileUploader
             onFileSelect={handleFileSelect}
             isLoading={isLoadingFile}
@@ -735,6 +793,37 @@ export default function AudioReader() {
                         Select a {fileType === "epub" ? "chapter" : "page"} to load text
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Generation Progress */}
+              {status === "generating" && (
+                <div className="mt-3 sm:mt-4">
+                  <GenerationProgress
+                    isGenerating={true}
+                    currentChunk={generationProgress.current}
+                    totalChunks={generationProgress.total}
+                    device={device || undefined}
+                    textLength={text.length}
+                  />
+                </div>
+              )}
+
+              {/* Performance Warning for Long Texts */}
+              {device === 'wasm' && text.length > 500 && status === "ready" && shouldShowSlowWarning(text.length, device) && (
+                <div className="mt-3 sm:mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Cpu className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-yellow-800 mb-1">
+                        Long text detected with WASM backend
+                      </p>
+                      <p className="text-yellow-700">
+                        This will take approximately {estimateGenerationTime(text.length, device).estimatedTimeFormatted}. 
+                        Consider breaking into smaller paragraphs for faster processing.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

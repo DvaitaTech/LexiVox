@@ -63,6 +63,10 @@ export const AudioChunk = memo(function AudioChunk({
   }, [active, playing]);
 
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Create blob URL without aggressive cleanup for now
+  const url = useMemo(() => URL.createObjectURL(audio), [audio]);
+
   useEffect(() => {
     if (!audio) return;
     if (!audioRef.current) return;
@@ -78,15 +82,6 @@ export const AudioChunk = memo(function AudioChunk({
       audioRef.current.currentTime = 0;
     }
   }, [audio, active]);
-
-  const url = useMemo(() => URL.createObjectURL(audio), [audio]);
-
-  // Clean up blob URL when component unmounts or audio changes
-  useEffect(() => {
-    return () => {
-      URL.revokeObjectURL(url);
-    };
-  }, [url]);
 
   return (
     <div
