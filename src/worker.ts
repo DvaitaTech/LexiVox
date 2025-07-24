@@ -67,8 +67,9 @@ async function loadModel() {
     resetIdleTimer();
     return tts;
     
-  } catch (e: Error) {
-    self.postMessage({ status: "error", error: e.message, device });
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    self.postMessage({ status: "error", error: errorMessage, device });
     throw e;
   }
 }
