@@ -12,9 +12,9 @@ export function TextStatistics({ text }: TextStatisticsProps) {
   ];
 
   return (
-    <div className="flex gap-6 text-sm text-muted-foreground">
+    <div className="flex gap-2 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
       {stats.map(({ label, value }) => (
-        <div key={label} className="flex gap-1.5">
+        <div key={label} className="flex gap-1 sm:gap-1.5 whitespace-nowrap">
           <span className="font-semibold">{label}:</span>
           <span className="font-medium">{value}</span>
         </div>

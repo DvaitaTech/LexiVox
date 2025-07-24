@@ -91,28 +91,29 @@ export function InstallPrompt() {
   }
 
   return (
-    <Card className="fixed bottom-4 left-4 right-4 z-50 border-blue-200 bg-blue-50 md:left-auto md:right-4 md:w-80">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex-1">
-            <h3 className="font-semibold text-blue-900">Install LexiVox</h3>
-            <p className="text-sm text-blue-700 mt-1">
-              Install our app for a better experience with offline access and faster loading.
+    <Card className="fixed bottom-2 sm:bottom-4 left-2 sm:left-4 right-2 sm:right-4 z-50 border-blue-200 bg-blue-50 md:left-auto md:right-4 md:w-80">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-start gap-2 sm:gap-3">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-blue-900 text-sm sm:text-base">Install LexiVox</h3>
+            <p className="text-xs sm:text-sm text-blue-700 mt-1">
+              <span className="hidden sm:inline">Install our app for a better experience with offline access and faster loading.</span>
+              <span className="sm:hidden">Install for better offline experience.</span>
             </p>
-            <div className="flex gap-2 mt-3">
+            <div className="flex gap-2 mt-2 sm:mt-3">
               <Button
                 size="sm"
                 onClick={handleInstallClick}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 h-8 text-xs sm:text-sm touch-manipulation"
               >
-                <Download className="mr-1 h-4 w-4" />
+                <Download className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
                 Install
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleDismiss}
-                className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                className="border-blue-300 text-blue-700 hover:bg-blue-100 h-8 text-xs sm:text-sm touch-manipulation"
               >
                 Later
               </Button>
@@ -122,9 +123,9 @@ export function InstallPrompt() {
             size="sm"
             variant="ghost"
             onClick={handleDismiss}
-            className="text-blue-700 hover:bg-blue-100 p-1"
+            className="text-blue-700 hover:bg-blue-100 p-1 h-6 w-6 sm:h-8 sm:w-8 touch-manipulation flex-shrink-0"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
         </div>
       </CardContent>

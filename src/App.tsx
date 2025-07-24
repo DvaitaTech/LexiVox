@@ -492,18 +492,20 @@ export default function AudioReader() {
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50/50 p-4 md:p-12">
+      <div className="min-h-screen bg-gray-50/50 p-2 sm:p-4 md:p-12">
         <div className="container mx-auto max-w-4xl">
-          <div className="text-center mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <div></div> {/* Spacer */}
-              <div className="inline-flex items-center gap-2">
-                <AudioWaveform className="size-12 text-blue-500" />
-                <h1 className="text-5xl font-bold text-gray-900">LexiVox</h1>
+          <div className="text-center mb-4 sm:mb-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-2">
+              <div className="hidden sm:block"></div> {/* Spacer for desktop */}
+              <div className="flex items-center gap-2 sm:gap-3">
+                <AudioWaveform className="size-8 sm:size-10 md:size-12 text-blue-500" />
+                <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-gray-900">LexiVox</h1>
               </div>
-              <InstallButton />
+              <div className="sm:block">
+                <InstallButton />
+              </div>
             </div>
-            <p className="text-gray-500">
+            <p className="text-sm sm:text-base text-gray-500 px-4 sm:px-0">
               Transform EPUB books and PDF documents into natural speech
             </p>
           </div>
@@ -533,12 +535,12 @@ export default function AudioReader() {
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     placeholder="Type or paste your text here..."
-                    className={`transition-all min-h-[180px] text-lg leading-relaxed ${processed && status === "ready" ? "bg-green-100" : ""} resize-y ${status === "loading" ? "text-gray-300" : ""}`}
+                    className={`transition-all min-h-[120px] sm:min-h-[180px] text-base sm:text-lg leading-relaxed ${processed && status === "ready" ? "bg-green-100" : ""} resize-y ${status === "loading" ? "text-gray-300" : ""}`}
                   />
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="absolute top-2 right-2 h-8 w-8"
+                    className="absolute top-2 right-2 h-8 w-8 touch-manipulation"
                     onClick={handleCopy}
                   >
                     {copied ? (
@@ -550,15 +552,17 @@ export default function AudioReader() {
                 </div>
               ) : (
                 <div className="relative">
-                  <div className="p-4 bg-gray-50 rounded-lg border">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-semibold text-lg">
-                        {fileType === "epub" ? epubMetadata!.title : pdfMetadata!.title}
+                  <div className="p-3 sm:p-4 bg-gray-50 rounded-lg border">
+                    <div className="flex items-start justify-between mb-2 gap-2">
+                      <h3 className="font-semibold text-base sm:text-lg flex-1 min-w-0">
+                        <span className="line-clamp-2 sm:line-clamp-none">
+                          {fileType === "epub" ? epubMetadata!.title : pdfMetadata!.title}
+                        </span>
                       </h3>
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8"
+                        className="h-8 w-8 touch-manipulation flex-shrink-0"
                         onClick={handleCopy}
                       >
                         {copied ? (
@@ -569,15 +573,15 @@ export default function AudioReader() {
                       </Button>
                     </div>
                     {fileType === "epub" && selectedChapter ? (
-                      <div className="text-sm text-gray-600 mb-3">
-                        Current chapter: {epubMetadata!.chapters.find(ch => ch.id === selectedChapter)?.label}
+                      <div className="text-xs sm:text-sm text-gray-600 mb-3">
+                        <span className="font-medium">Chapter:</span> <span className="line-clamp-1">{epubMetadata!.chapters.find(ch => ch.id === selectedChapter)?.label}</span>
                       </div>
                     ) : fileType === "pdf" && selectedPage ? (
-                      <div className="text-sm text-gray-600 mb-3">
-                        Current page: Page {selectedPage} of {pdfMetadata!.totalPages}
+                      <div className="text-xs sm:text-sm text-gray-600 mb-3">
+                        <span className="font-medium">Current:</span> Page {selectedPage} of {pdfMetadata!.totalPages}
                       </div>
                     ) : (
-                      <div className="text-sm text-gray-500 mb-3">
+                      <div className="text-xs sm:text-sm text-gray-500 mb-3">
                         Select a {fileType === "epub" ? "chapter" : "page"} to load text
                       </div>
                     )}
@@ -587,9 +591,9 @@ export default function AudioReader() {
 
               {/* Currently Playing Text Display */}
               {chunks.length > 0 && currentChunkIndex >= 0 && currentChunkIndex < chunks.length && (
-                <div className="mt-4 p-4 bg-white rounded-lg border">
-                  <div className="text-sm font-medium text-gray-600 mb-2">Currently Reading:</div>
-                  <div className="text-lg text-gray-800 leading-relaxed">
+                <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-white rounded-lg border">
+                  <div className="text-xs sm:text-sm font-medium text-gray-600 mb-2">Currently Reading:</div>
+                  <div className="text-sm sm:text-lg text-gray-800 leading-relaxed">
                     {chunks[currentChunkIndex].text}
                   </div>
                 </div>
@@ -598,7 +602,7 @@ export default function AudioReader() {
               <div className="flex justify-end pt-2">
                 <TextStatistics text={text} />
               </div>
-              <div className="flex gap-4 pb-4 min-h-14 items-center justify-center">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 pb-3 sm:pb-4 min-h-12 sm:min-h-14 items-center justify-center">
                 {voices ? (
                   <>
                     <VoiceSelector
@@ -606,16 +610,16 @@ export default function AudioReader() {
                       selectedVoice={selectedVoice}
                       onVoiceChange={setSelectedVoice}
                     />
-                    <div className="flex items-center gap-4 w-44">
+                    <div className="flex items-center gap-4 w-full sm:w-44">
                       <SpeedControl speed={speed} onSpeedChange={setSpeed} />
                     </div>
                   </>
                 ) : error ? (
-                  <div className="text-red-400 font-semibold text-lg/6 text-center p-2">
+                  <div className="text-red-400 font-semibold text-base sm:text-lg/6 text-center p-2">
                     {error}
                   </div>
                 ) : (
-                  <div className="animate-pulse text-center">
+                  <div className="animate-pulse text-center text-sm sm:text-base">
                     Loading model...
                   </div>
                 )}
@@ -624,11 +628,11 @@ export default function AudioReader() {
               <Separator />
 
               {/* Media Player Controls */}
-              <div className="py-6">
-                <div className="flex items-center justify-center gap-2 mb-4">
+              <div className="py-4 sm:py-6">
+                <div className="flex items-center justify-center gap-0.5 sm:gap-2 mb-4 px-2">
                   {/* Section Navigation */}
                   <Button
-                    size="lg"
+                    size="sm"
                     variant="ghost"
                     onClick={handlePreviousSection}
                     disabled={
@@ -642,20 +646,20 @@ export default function AudioReader() {
                         selectedPage === 1
                       ) : true
                     }
-                    className="h-12 w-12"
+                    className="h-8 w-8 sm:h-12 sm:w-12 touch-manipulation"
                   >
-                    <ChevronLeft className="size-6" />
+                    <ChevronLeft className="size-3 sm:size-6" />
                   </Button>
 
                   {/* Chunk Navigation */}
                   <Button
-                    size="lg"
+                    size="sm"
                     variant="ghost"
                     onClick={handlePreviousChunk}
                     disabled={currentChunkIndex <= 0 || chunks.length === 0}
-                    className="h-12 w-12"
+                    className="h-8 w-8 sm:h-12 sm:w-12 touch-manipulation"
                   >
-                    <SkipBack className="size-5" />
+                    <SkipBack className="size-3 sm:size-5" />
                   </Button>
 
                   {/* Play/Pause */}
@@ -663,7 +667,7 @@ export default function AudioReader() {
                     size="lg"
                     onClick={handlePlayPause}
                     className={cn(
-                      "h-16 w-16 rounded-full text-lg transition-all",
+                      "h-12 w-12 sm:h-16 sm:w-16 rounded-full text-lg transition-all touch-manipulation",
                       isPlaying && "bg-orange-600 hover:bg-orange-700",
                     )}
                     disabled={
@@ -672,26 +676,26 @@ export default function AudioReader() {
                     }
                   >
                     {isPlaying ? (
-                      <Pause className="size-8" />
+                      <Pause className="size-5 sm:size-8" />
                     ) : (
-                      <Play className="size-8 ml-1" />
+                      <Play className="size-5 sm:size-8 ml-0.5 sm:ml-1" />
                     )}
                   </Button>
 
                   {/* Chunk Navigation */}
                   <Button
-                    size="lg"
+                    size="sm"
                     variant="ghost"
                     onClick={handleNextChunk}
                     disabled={currentChunkIndex >= chunks.length - 1 || chunks.length === 0}
-                    className="h-12 w-12"
+                    className="h-8 w-8 sm:h-12 sm:w-12 touch-manipulation"
                   >
-                    <SkipForward className="size-5" />
+                    <SkipForward className="size-3 sm:size-5" />
                   </Button>
 
                   {/* Section Navigation */}
                   <Button
-                    size="lg"
+                    size="sm"
                     variant="ghost"
                     onClick={handleNextSection}
                     disabled={
@@ -705,16 +709,17 @@ export default function AudioReader() {
                         selectedPage === pdfMetadata.totalPages
                       ) : true
                     }
-                    className="h-12 w-12"
+                    className="h-8 w-8 sm:h-12 sm:w-12 touch-manipulation"
                   >
-                    <ChevronRight className="size-6" />
+                    <ChevronRight className="size-3 sm:size-6" />
                   </Button>
                 </div>
 
                 {/* Secondary Controls */}
-                <div className="flex items-center justify-center gap-4">
+                <div className="flex items-center justify-center gap-2 sm:gap-4">
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={() => {
                       if (!result) return;
                       const url = URL.createObjectURL(result);
@@ -725,9 +730,10 @@ export default function AudioReader() {
                       URL.revokeObjectURL(url);
                     }}
                     disabled={!result || status !== "ready"}
+                    className="touch-manipulation h-8 sm:h-9"
                   >
-                    <Download className="mr-2 size-4" />
-                    Download
+                    <Download className="mr-1 sm:mr-2 size-3 sm:size-4" />
+                    <span className="text-xs sm:text-sm">Download</span>
                   </Button>
                 </div>
               </div>

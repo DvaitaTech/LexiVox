@@ -95,11 +95,12 @@ export function InstallButton() {
       onClick={handleInstallClick}
       variant="outline"
       size="sm"
-      className="gap-2"
+      className="gap-1 sm:gap-2 h-8 sm:h-9 text-xs sm:text-sm touch-manipulation"
       title={`PWA Status: ${debugInfo} | Prompt: ${deferredPrompt ? 'Available' : 'Not Available'}`}
     >
-      <Download className="h-4 w-4" />
-      Install App {deferredPrompt ? '✓' : '?'}
+      <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+      <span className="hidden sm:inline">Install App {deferredPrompt ? '✓' : '?'}</span>
+      <span className="sm:hidden">Install {deferredPrompt ? '✓' : '?'}</span>
     </Button>
   );
 }
