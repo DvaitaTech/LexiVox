@@ -218,26 +218,65 @@ export default function AudioReader() {
 
           <Card className="shadow-lg">
             <CardContent>
-              <div className="relative">
-                <Textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Type or paste your text here..."
-                  className={`transition-all min-h-[180px] text-lg leading-relaxed ${processed && status === "ready" ? "bg-green-100" : ""} resize-y ${status === "loading" ? "text-gray-300" : ""}`}
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="absolute top-2 right-2 h-8 w-8"
-                  onClick={handleCopy}
-                >
-                  {copied ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
+              {!epubMetadata ? (
+                <div className="relative">
+                  <Textarea
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="Type or paste your text here..."
+                    className={`transition-all min-h-[180px] text-lg leading-relaxed ${processed && status === "ready" ? "bg-green-100" : ""} resize-y ${status === "loading" ? "text-gray-300" : ""}`}
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute top-2 right-2 h-8 w-8"
+                    onClick={handleCopy}
+                  >
+                    {copied ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="p-4 bg-gray-50 rounded-lg border">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-semibold text-lg">{epubMetadata.title}</h3>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={handleCopy}
+                      >
+                        {copied ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    {selectedChapter ? (
+                      <div className="text-sm text-gray-600 mb-3">
+                        Current chapter: {epubMetadata.chapters.find(ch => ch.id === selectedChapter)?.label}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500 mb-3">Select a chapter to load text</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Currently Playing Text Display */}
+              {chunks.length > 0 && currentChunkIndex >= 0 && currentChunkIndex < chunks.length && (
+                <div className="mt-4 p-4 bg-white rounded-lg border">
+                  <div className="text-sm font-medium text-gray-600 mb-2">Currently Reading:</div>
+                  <div className="text-lg text-gray-800 leading-relaxed">
+                    {chunks[currentChunkIndex].text}
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end pt-2">
                 <TextStatistics text={text} />
@@ -314,8 +353,9 @@ export default function AudioReader() {
                 </Button>
               </div>
 
+              {/* Hidden AudioChunk components for original streaming functionality */}
               {chunks.length > 0 && (
-                <div className="mt-4 space-y-1 max-h-[320px] overflow-y-auto px-1 hover">
+                <div className="hidden">
                   {chunks.map(({ text, audio }, index) => (
                     <AudioChunk
                       key={index}
@@ -351,6 +391,7 @@ export default function AudioReader() {
                   ))}
                 </div>
               )}
+
             </CardContent>
           </Card>
         </div>
