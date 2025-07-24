@@ -237,28 +237,82 @@ export default function AudioReader() {
   };
 
   const handlePreviousChapter = async () => {
-    if (!epubMetadata || !selectedChapter) return;
+    if (!epubMetadata || !selectedChapter || !epubParser) return;
     
     const currentChapterIndex = epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter);
     if (currentChapterIndex > 0) {
       const wasPlaying = isPlaying;
       setIsPlaying(false); // Stop current playback
+      setChunks([]); // Clear existing chunks to prevent conflicts
+      setCurrentChunkIndex(-1); // Reset chunk index
+      
       const prevChapter = epubMetadata.chapters[currentChapterIndex - 1];
-      await handleChapterSelect(prevChapter.id, wasPlaying); // Pass playing state
-      setCurrentChunkIndex(0);
+      
+      // Load chapter text directly
+      setIsLoadingChapter(true);
+      try {
+        const chapterText = await epubParser.getChapterText(prevChapter.href);
+        setText(chapterText);
+        setSelectedChapter(prevChapter.id);
+        toast.success(`Loaded: ${prevChapter.label}`);
+        
+        if (wasPlaying) {
+          // Start playing the new chapter with the correct text
+          setTimeout(() => {
+            setCurrentChunkIndex(0);
+            setIsPlaying(true);
+            const params = { text: chapterText, voice: selectedVoice, speed };
+            setLastGeneration(params);
+            setStatus("generating");
+            worker.current?.postMessage(params);
+          }, 200);
+        }
+      } catch (error) {
+        console.error("Failed to load chapter:", error);
+        toast.error("Failed to load chapter text");
+      } finally {
+        setIsLoadingChapter(false);
+      }
     }
   };
 
   const handleNextChapter = async () => {
-    if (!epubMetadata || !selectedChapter) return;
+    if (!epubMetadata || !selectedChapter || !epubParser) return;
     
     const currentChapterIndex = epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter);
     if (currentChapterIndex < epubMetadata.chapters.length - 1) {
       const wasPlaying = isPlaying;
       setIsPlaying(false); // Stop current playback
+      setChunks([]); // Clear existing chunks to prevent conflicts
+      setCurrentChunkIndex(-1); // Reset chunk index
+      
       const nextChapter = epubMetadata.chapters[currentChapterIndex + 1];
-      await handleChapterSelect(nextChapter.id, wasPlaying); // Pass playing state
-      setCurrentChunkIndex(0);
+      
+      // Load chapter text directly
+      setIsLoadingChapter(true);
+      try {
+        const chapterText = await epubParser.getChapterText(nextChapter.href);
+        setText(chapterText);
+        setSelectedChapter(nextChapter.id);
+        toast.success(`Loaded: ${nextChapter.label}`);
+        
+        if (wasPlaying) {
+          // Start playing the new chapter with the correct text
+          setTimeout(() => {
+            setCurrentChunkIndex(0);
+            setIsPlaying(true);
+            const params = { text: chapterText, voice: selectedVoice, speed };
+            setLastGeneration(params);
+            setStatus("generating");
+            worker.current?.postMessage(params);
+          }, 200);
+        }
+      } catch (error) {
+        console.error("Failed to load chapter:", error);
+        toast.error("Failed to load chapter text");
+      } finally {
+        setIsLoadingChapter(false);
+      }
     }
   };
 
