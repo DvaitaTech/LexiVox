@@ -116,21 +116,21 @@ self.addEventListener("message", async (e) => {
 
   const chunks = [];
   let chunkIndex = 0;
+  // Calculate estimated total based on original text length (rough: 75 chars per chunk)
+  const estimatedTotal = Math.ceil(text.length / 75);
   
-  for await (const { text, audio } of stream) {
+  for await (const { text: chunkText, audio } of stream) {
     chunkIndex++;
     
     self.postMessage({
       status: "stream",
       chunk: {
         audio: audio.toBlob(),
-        text,
+        text: chunkText,
       },
       progress: {
         current: chunkIndex,
-        // We don't know total chunks ahead of time, so we'll estimate
-        // based on text length (rough: 75 chars per chunk)
-        estimatedTotal: Math.ceil(text.length / 75),
+        estimatedTotal,
         device
       }
     });
