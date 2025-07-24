@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LexiVox is a mobile-first Progressive Web Application (PWA) for browser-based text-to-speech built with React 19 + TypeScript + Vite. It uses the Kokoro TTS model (82M parameters) running entirely in the browser via Transformers.js, supporting both WebGPU and WASM backends for ML inference. The app supports document reading from EPUB and PDF files with chapter/page navigation, background playback, and comprehensive mobile optimizations.
+LexiVox is a browser-based text-to-speech Progressive Web Application (PWA) built with React 19 + TypeScript + Vite. It uses the Kokoro TTS model (82M parameters) running entirely in the browser via Transformers.js, supporting both WebGPU and WASM backends for ML inference. The app transforms EPUB books and PDF documents into natural speech with chapter/page navigation, background playback, and offline capabilities.
 
 ## Development Commands
 
@@ -22,8 +22,7 @@ LexiVox is a mobile-first Progressive Web Application (PWA) for browser-based te
 - **components/** - Reusable UI components built on shadcn/ui and Radix UI
 
 ### Key Dependencies
-- **kokoro-js** - Main TTS library providing KokoroTTS class and TextSplitterStream
-- **@huggingface/transformers** - ML model execution (WebGPU/WASM backends)
+- **kokoro-js** - Main TTS library providing KokoroTTS class and TextSplitterStream for final text chunking
 - **shadcn/ui + Radix UI** - Component library for consistent UI (30+ components)
 - **Tailwind CSS v4** - Styling with new Vite plugin
 - **Lucide React** - Icons
@@ -31,13 +30,15 @@ LexiVox is a mobile-first Progressive Web Application (PWA) for browser-based te
 - **pdfjs-dist** - PDF document parsing and text extraction
 - **vite-plugin-pwa** - Progressive Web App capabilities with Workbox caching
 
-### Data Flow
-1. User uploads EPUB/PDF files via FileUploader component or enters text directly
-2. Document parsers (epub-parser.ts/pdf-parser.ts) extract text and structure
-3. App.tsx manages TTS state and sends text/voice/speed to Web Worker
-4. worker.ts loads Kokoro model, processes text through TextSplitterStream
-5. Audio chunks streamed back to main thread via postMessage
-6. AudioChunk components handle individual playback with audio controls
+### Data Flow & Text Processing Pipeline
+1. **Document Loading**: User uploads EPUB/PDF files via FileUploader component or enters text directly
+2. **Document Parsing**: Document parsers extract metadata and structure (no bulk text loading)
+3. **Segmentation**: Large documents split into 2000-character segments for memory efficiency
+4. **TTS Generation**: App.tsx sends segment text/voice/speed to Web Worker via postMessage
+5. **Text Chunking**: worker.ts processes text through TextSplitterStream (~75 chars per chunk)
+6. **Audio Generation**: Kokoro model generates audio chunks with sliding window buffering (5 chunks ahead)
+7. **Playback**: AudioChunk components handle individual audio playback with controls
+8. **Navigation**: Auto-advancement to next segments/chapters when current segment completes
 
 ### File Structure
 - `src/components/ui/` - shadcn/ui components (30+ reusable UI primitives)
@@ -56,18 +57,23 @@ LexiVox is a mobile-first Progressive Web Application (PWA) for browser-based te
 - **Build target** - ESNext for latest JS features
 - **Module system** - Pure ES modules throughout (package.json "type": "module")
 
-## Document Processing
-- **EPUB Support** - Full chapter navigation with nested structure via epubjs
+## Document Processing Architecture
+- **EPUB Support** - Nested chapter structure via epubjs with 2000-character segmentation
 - **PDF Support** - Page-by-page text extraction via pdfjs-dist
+- **Memory Management** - Pagination system prevents loading entire chapters/pages into memory
+- **Segment-based Loading** - Text loaded on-demand with LRU cache (5 chapters max)
 - **File Size Limit** - 50MB maximum for uploaded documents
-- **Unified Interface** - Both parsers provide consistent metadata structures
+- **Unified Interface** - Both parsers provide consistent metadata and segment structures
 
-## Web Worker Architecture
+## Web Worker Architecture & Chunking Strategy
 - **TTS Processing** - Isolated in worker.ts to prevent main thread blocking
 - **Backend Detection** - Automatic WebGPU/WASM fallback based on browser capabilities
-- **Streaming Audio** - Real-time audio chunk generation and playback
+- **Sliding Window Generation** - Buffered chunk generation (5 chunks ahead, request more when ≤2 remain)
+- **Text Chunking Pipeline**: 
+  - Segment text (2000 chars) → TextSplitterStream (~75 chars) → Audio chunks
+  - Final chunking logic handled by kokoro-js TextSplitterStream (not in codebase)
 - **Model Loading** - Kokoro TTS model loaded on-demand with idle timer (5min timeout)
-- **Memory Management** - Automatic model unloading and lazy parser loading
+- **Memory Management** - Automatic model unloading and chunk buffer cleanup
 
 ## Mobile Optimizations
 - **Memory Management** - Sliding window audio chunk cleanup and model idle unloading
@@ -82,13 +88,23 @@ LexiVox is a mobile-first Progressive Web Application (PWA) for browser-based te
 - **Wake Lock** - Prevents screen sleep during playback
 - **Background Audio** - Continues playing when app is backgrounded
 
-## Caching Strategy
-- **Model Files** - TTS model cached for 30 days (100MB limit)
-- **Audio Blobs** - Generated audio cached for 1 week
-- **Documents** - EPUB/PDF files cached for 30 days
-- **Fonts & Assets** - Standard web assets with appropriate TTL
+## PWA Caching Strategy (vite.config.ts)
+- **TTS Model Cache** - Kokoro model files cached for 30 days (1GB cache limit)
+- **Audio Cache** - Generated audio blobs cached for 1 week (100 entries max)
+- **Document Cache** - EPUB/PDF files cached for 30 days (10 entries max)
+- **Web Fonts** - Google Fonts cached with StaleWhileRevalidate strategy
+- **Runtime Caching** - Workbox handles model downloads from HuggingFace CDN
 
-## Testing
+## Testing & Performance
 - **No formal testing framework configured** - Consider adding Vitest or Jest for future development
+- **Performance Monitoring** - Device-specific estimation utilities (performance-estimates.ts)
+- **Backend Performance** - WebGPU ~3-4x faster than WASM (0.8 vs 0.25 chunks/sec)
 - Manual testing via `npm run dev` and browser testing tools
 - Mobile testing recommended on actual devices for gesture and background features
+
+## Important Implementation Notes
+- **Version Management** - Current version tracked in package.json (1.2.0) and displayed via VersionBadge component
+- **Toast Positioning** - Notifications positioned at top-right via Sonner library
+- **State Management** - No external state library; uses React useState/useEffect with Web Worker communication
+- **Responsive Design** - Mobile-first approach with swipe gestures and optimized touch targets
+- **Error Handling** - Comprehensive error boundaries in worker.ts with device-specific error messages
