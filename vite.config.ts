@@ -95,9 +95,39 @@ export default defineConfig({
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
               }
             }
+          },
+          {
+            // Cache TTS model files from Hugging Face
+            urlPattern: /^https:\/\/huggingface\.co\/.*\.(onnx|json|bin)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'tts-model-cache',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            // Cache model files from CDN
+            urlPattern: /^https:\/\/cdn-lfs.*\.huggingface\.co\/.*$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'tts-model-files',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
           }
         ],
-        maximumFileSizeToCacheInBytes: 50 * 1024 * 1024, // 50MB for large files
+        maximumFileSizeToCacheInBytes: 1000 * 1024 * 1024, // 1000MB to accommodate TTS model (82MB)
         skipWaiting: true,
         clientsClaim: true
       }
