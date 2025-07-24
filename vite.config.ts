@@ -21,25 +21,32 @@ export default defineConfig({
         theme_color: '#3b82f6',
         background_color: '#ffffff',
         display: 'standalone',
-        orientation: 'portrait-primary',
+        orientation: 'any',
         scope: '/',
         start_url: '/',
         icons: [
           {
-            src: 'waveform.svg',
-            sizes: '24x24',
-            type: 'image/svg+xml'
+            src: 'pwa-icon.svg',
+            sizes: '192x192',
+            type: 'image/svg+xml',
+            purpose: 'any'
           },
           {
             src: 'pwa-icon.svg',
-            sizes: '192x192 512x512',
+            sizes: '512x512', 
             type: 'image/svg+xml',
             purpose: 'any'
           },
           {
             src: 'maskable-icon.svg', 
-            sizes: '192x192 512x512',
+            sizes: '192x192',
             type: 'image/svg+xml',
+            purpose: 'maskable'
+          },
+          {
+            src: 'maskable-icon.svg', 
+            sizes: '512x512',
+            type: 'image/svg+xml', 
             purpose: 'maskable'
           }
         ]

@@ -29,6 +29,7 @@ import type { AudioChunkData } from "./components/audio-chunk";
 import { FileUploader } from "./components/file-uploader";
 import { NavigationSelector } from "./components/navigation-selector";
 import { InstallPrompt } from "./components/install-prompt";
+import { InstallButton } from "./components/install-button";
 import { EpubParser, type EpubMetadata } from "./utils/epub-parser";
 import { PdfParser, type PdfMetadata } from "./utils/pdf-parser";
 
@@ -494,9 +495,13 @@ export default function AudioReader() {
       <div className="min-h-screen bg-gray-50/50 p-4 md:p-12">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-4">
-            <div className="inline-flex items-center gap-2">
-              <AudioWaveform className="size-12 text-blue-500" />
-              <h1 className="text-5xl font-bold text-gray-900">LexiVox</h1>
+            <div className="flex items-center justify-between mb-2">
+              <div></div> {/* Spacer */}
+              <div className="inline-flex items-center gap-2">
+                <AudioWaveform className="size-12 text-blue-500" />
+                <h1 className="text-5xl font-bold text-gray-900">LexiVox</h1>
+              </div>
+              <InstallButton />
             </div>
             <p className="text-gray-500">
               Transform EPUB books and PDF documents into natural speech
