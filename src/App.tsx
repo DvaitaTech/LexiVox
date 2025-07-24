@@ -42,6 +42,7 @@ import { ModelLoadingIndicator } from "./components/model-loading-indicator";
 import { GenerationProgress } from "./components/generation-progress";
 import { DevicePerformanceInfo } from "./components/device-performance-info";
 import { shouldShowSlowWarning, estimateGenerationTime, type DeviceType } from "./utils/performance-estimates";
+import { VersionBadge } from "./components/version-badge";
 
 export default function AudioReader() {
   const [text, setText] = useState(
@@ -690,9 +691,12 @@ export default function AudioReader() {
                 <InstallButton />
               </div>
             </div>
-            <p className="text-sm sm:text-base text-gray-500 px-4 sm:px-0">
-              Transform EPUB books and PDF documents into natural speech
-            </p>
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-sm sm:text-base text-gray-500 px-4 sm:px-0">
+                Transform EPUB books and PDF documents into natural speech
+              </p>
+              <VersionBadge />
+            </div>
           </div>
 
           {/* Model Loading Indicator */}
