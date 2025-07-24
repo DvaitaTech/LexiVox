@@ -866,7 +866,7 @@ export default function AudioReader() {
                 </div>
 
                 {/* Secondary Controls */}
-                <div className="flex items-center justify-center gap-2 sm:gap-4">
+                {/* <div className="flex items-center justify-center gap-2 sm:gap-4">
                   <Button
                     variant="outline"
                     size="sm"
@@ -882,10 +882,10 @@ export default function AudioReader() {
                     disabled={!result || status !== "ready"}
                     className="touch-manipulation h-8 sm:h-9"
                   >
-                    {/* <Download className="mr-1 sm:mr-2 size-3 sm:size-4" /> */}
-                    {/* <span className="text-xs sm:text-sm">Download</span> */}
+                    <Download className="mr-1 sm:mr-2 size-3 sm:size-4" />
+                    <span className="text-xs sm:text-sm">Download</span>
                   </Button>
-                </div>
+                </div> */}
               </div>
 
               {/* Hidden AudioChunk components for original streaming functionality */}
