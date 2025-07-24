@@ -100,60 +100,172 @@ function resetIdleTimer() {
 // Initial model load
 await loadModel();
 
+// Buffered generation state
+let currentGenerationId: string | null = null;
+let generationStream: any = null;
+let streamIterator: any = null;
+let chunkBuffer: any[] = [];
+let currentPlayIndex = 0;
+let totalEstimatedChunks = 0;
+let generationComplete = false;
+
 // Listen for messages from the main thread
 self.addEventListener("message", async (e) => {
-  const { text, voice, speed } = e.data;
+  const { type, text, voice, speed, generationId, requestChunkIndex } = e.data;
+
+  if (type === "generate") {
+    // Start new generation
+    await startGeneration(text, voice, speed, generationId);
+  } else if (type === "request_chunk") {
+    // Request specific chunk for playback
+    await handleChunkRequest(requestChunkIndex, generationId);
+  } else if (type === "stop") {
+    // Stop current generation
+    stopGeneration();
+  }
+});
+
+async function startGeneration(text: string, voice: any, speed: number, generationId: string) {
+  // Stop any existing generation
+  stopGeneration();
+  
+  // Reset state
+  currentGenerationId = generationId;
+  chunkBuffer = [];
+  currentPlayIndex = 0;
+  generationComplete = false;
+  totalEstimatedChunks = Math.ceil(text.length / 75);
 
   // Ensure model is loaded
   const model = await loadModel();
-  resetIdleTimer(); // Reset timer on each use
+  resetIdleTimer();
 
   const streamer = new TextSplitterStream();
   streamer.push(text);
-  streamer.close(); // Indicate we won't add more text
+  streamer.close();
 
-  const stream = model.stream(streamer, { voice, speed });
+  generationStream = model.stream(streamer, { voice, speed });
+  streamIterator = generationStream[Symbol.asyncIterator]();
 
-  const chunks = [];
-  let chunkIndex = 0;
-  // Calculate estimated total based on original text length (rough: 75 chars per chunk)
-  const estimatedTotal = Math.ceil(text.length / 75);
+  // Generate first 5 chunks immediately
+  await generateChunksAhead(5);
+}
+
+async function generateChunksAhead(chunksToGenerate: number) {
+  if (!streamIterator || generationComplete || currentGenerationId === null) return;
+
+  let generated = 0;
   
-  for await (const { text: chunkText, audio } of stream) {
-    chunkIndex++;
-    
-    self.postMessage({
-      status: "stream",
-      chunk: {
-        audio: audio.toBlob(),
-        text: chunkText,
-      },
-      progress: {
-        current: chunkIndex,
-        estimatedTotal,
-        device
+  try {
+    while (generated < chunksToGenerate && !generationComplete && currentGenerationId !== null) {
+      const result = await streamIterator.next();
+      
+      if (result.done) {
+        // Stream is complete
+        generationComplete = true;
+        break;
       }
-    });
-    chunks.push(audio);
-    resetIdleTimer(); // Keep resetting timer during generation
-  }
+      
+      const { text: chunkText, audio } = result.value;
+      const chunkIndex = chunkBuffer.length;
+      
+      chunkBuffer.push({
+        text: chunkText,
+        audio,
+        index: chunkIndex
+      });
 
-  // Merge chunks
-  let audio;
-  if (chunks.length > 0) {
-    const sampling_rate = chunks[0].sampling_rate;
-    const length = chunks.reduce((sum, chunk) => sum + chunk.audio.length, 0);
-    const waveform = new Float32Array(length);
-    let offset = 0;
-    for (const { audio } of chunks) {
-      waveform.set(audio, offset);
-      offset += audio.length;
+      // Send chunk to main thread
+      self.postMessage({
+        status: "chunk_ready",
+        generationId: currentGenerationId,
+        chunk: {
+          audio: audio.toBlob(),
+          text: chunkText,
+          index: chunkIndex
+        },
+        progress: {
+          current: chunkIndex + 1,
+          estimatedTotal: totalEstimatedChunks,
+          device
+        }
+      });
+
+      generated++;
+      resetIdleTimer();
     }
 
-    // Create a new merged RawAudio
-    // @ts-expect-error - So that we don't need to import RawAudio
-    audio = new chunks[0].constructor(waveform, sampling_rate);
+    // Check if generation is complete
+    if (generationComplete) {
+      
+      // Create final merged audio
+      if (chunkBuffer.length > 0) {
+        const chunks = chunkBuffer.map(c => c.audio);
+        const sampling_rate = chunks[0].sampling_rate;
+        const length = chunks.reduce((sum, chunk) => sum + chunk.audio.length, 0);
+        const waveform = new Float32Array(length);
+        let offset = 0;
+        for (const { audio } of chunks) {
+          waveform.set(audio, offset);
+          offset += audio.length;
+        }
+
+        const mergedAudio = new (chunks[0] as any).constructor(waveform, sampling_rate);
+        
+        self.postMessage({ 
+          status: "complete", 
+          generationId: currentGenerationId,
+          audio: mergedAudio.toBlob(),
+          totalChunks: chunkBuffer.length
+        });
+      }
+    }
+  } catch (error) {
+    if (currentGenerationId !== null) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      self.postMessage({ 
+        status: "error", 
+        error: errorMessage, 
+        generationId: currentGenerationId,
+        device 
+      });
+    }
+  }
+}
+
+async function handleChunkRequest(requestedIndex: number, generationId: string) {
+  // Ignore requests from old generations
+  if (generationId !== currentGenerationId) return;
+
+  currentPlayIndex = requestedIndex;
+
+  // Check if we need to generate more chunks
+  const bufferEnd = chunkBuffer.length - 1;
+  const bufferNeeded = requestedIndex + 5; // Keep 5 chunks ahead
+
+  if (bufferNeeded > bufferEnd && !generationComplete) {
+    const chunksToGenerate = Math.min(5, bufferNeeded - bufferEnd);
+    await generateChunksAhead(chunksToGenerate);
   }
 
-  self.postMessage({ status: "complete", audio: audio.toBlob() });
-});
+  // Send current chunk if available
+  if (requestedIndex < chunkBuffer.length) {
+    const chunk = chunkBuffer[requestedIndex];
+    self.postMessage({
+      status: "chunk_available",
+      generationId: currentGenerationId,
+      chunk: {
+        audio: chunk.audio.toBlob(),
+        text: chunk.text,
+        index: chunk.index
+      }
+    });
+  }
+}
+
+function stopGeneration() {
+  currentGenerationId = null;
+  generationStream = null;
+  streamIterator = null;
+  // Keep buffer for potential resume, but mark as stopped
+}

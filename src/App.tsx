@@ -74,8 +74,9 @@ export default function AudioReader() {
   const worker = useRef<Worker | null>(null);
   const [voices, setVoices] = useState<Voices | null>(null);
   const [selectedVoice, setSelectedVoice] = useState<keyof Voices>("af_heart");
-  const [chunks, setChunks] = useState<AudioChunkData[]>([]);
+  const [chunks, setChunks] = useState<(AudioChunkData | null)[]>([]);
   const [result, setResult] = useState<Blob | null>(null);
+  const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
 
   // File state
   const [fileType, setFileType] = useState<"epub" | "pdf" | null>(null);
@@ -132,26 +133,54 @@ export default function AudioReader() {
           setLoadingProgress(0);
           break;
         case "error":
-          setStatus("error");
-          setError(data.error || data.data);
-          setLoadingProgress(0);
+          // Only handle errors from current generation
+          if (!data.generationId || data.generationId === currentGenerationId) {
+            setStatus("error");
+            setError(data.error || data.data);
+            setLoadingProgress(0);
+          }
           break;
-        case "stream": {
-          setChunks((prev) => [...prev, data.chunk]);
-          
-          // Update generation progress
-          if (data.progress) {
-            setGenerationProgress({
-              current: data.progress.current,
-              total: data.progress.estimatedTotal
+        case "chunk_ready": {
+          // Only handle chunks from current generation
+          if (data.generationId === currentGenerationId) {
+            setChunks((prev) => {
+              const newChunks = [...prev];
+              // Ensure array is large enough and fill any gaps with null
+              while (newChunks.length <= data.chunk.index) {
+                newChunks.push(null);
+              }
+              // Insert chunk at correct index
+              newChunks[data.chunk.index] = {
+                text: data.chunk.text,
+                audio: data.chunk.audio
+              };
+              return newChunks;
             });
+            
+            // Update generation progress
+            if (data.progress) {
+              setGenerationProgress({
+                current: data.progress.current,
+                total: data.progress.estimatedTotal
+              });
+            }
+          }
+          break;
+        }
+        case "chunk_available": {
+          // Handle on-demand chunk availability (for future use)
+          if (data.generationId === currentGenerationId) {
+            // Could be used for seeking or buffering specific chunks
           }
           break;
         }
         case "complete": {
-          setStatus("ready");
-          setResult(data.audio);
-          setGenerationProgress({ current: 0, total: 0 });
+          // Only handle completion from current generation
+          if (data.generationId === currentGenerationId) {
+            setStatus("ready");
+            setResult(data.audio);
+            setGenerationProgress({ current: 0, total: 0 });
+          }
           break;
         }
       }
@@ -171,7 +200,18 @@ export default function AudioReader() {
       worker.current?.removeEventListener("message", onMessageReceived);
       worker.current?.removeEventListener("error", onErrorReceived);
     };
-  }, []);
+  }, [currentGenerationId]);
+
+  // Request chunks as needed when playback position changes
+  useEffect(() => {
+    if (currentGenerationId && currentChunkIndex >= 0 && status === "generating") {
+      worker.current?.postMessage({
+        type: "request_chunk",
+        requestChunkIndex: currentChunkIndex,
+        generationId: currentGenerationId
+      });
+    }
+  }, [currentChunkIndex, currentGenerationId, status]);
 
   const processed =
     lastGeneration &&
@@ -181,11 +221,21 @@ export default function AudioReader() {
 
   const handlePlayPause = () => {
     if (!isPlaying && status === "ready" && !processed) {
+      // Start new generation with buffered approach
       setStatus("generating");
       setChunks([]);
       setCurrentChunkIndex(0);
-      const params = { text, voice: selectedVoice, speed };
-      setLastGeneration(params);
+      const generationId = Date.now().toString();
+      setCurrentGenerationId(generationId);
+      
+      const params = { 
+        type: "generate",
+        text, 
+        voice: selectedVoice, 
+        speed,
+        generationId
+      };
+      setLastGeneration({ text, voice: selectedVoice, speed });
       worker.current?.postMessage(params);
     }
     if (currentChunkIndex === -1) {
@@ -302,8 +352,17 @@ export default function AudioReader() {
         setStatus("generating");
         setChunks([]);
         setCurrentChunkIndex(0);
-        const params = { text: chapterText, voice: selectedVoice, speed };
-        setLastGeneration(params);
+        const generationId = Date.now().toString();
+        setCurrentGenerationId(generationId);
+        
+        const params = { 
+          type: "generate",
+          text: chapterText, 
+          voice: selectedVoice, 
+          speed,
+          generationId
+        };
+        setLastGeneration({ text: chapterText, voice: selectedVoice, speed });
         worker.current?.postMessage(params);
         toast.success(`Auto-advanced to: ${chapter.label}`);
       } else {
@@ -333,8 +392,17 @@ export default function AudioReader() {
         setStatus("generating");
         setChunks([]);
         setCurrentChunkIndex(0);
-        const params = { text: page.text, voice: selectedVoice, speed };
-        setLastGeneration(params);
+        const generationId = Date.now().toString();
+        setCurrentGenerationId(generationId);
+        
+        const params = { 
+          type: "generate",
+          text: page.text, 
+          voice: selectedVoice, 
+          speed,
+          generationId
+        };
+        setLastGeneration({ text: page.text, voice: selectedVoice, speed });
         worker.current?.postMessage(params);
         toast.success(`Auto-advanced to: Page ${pageNumber}`);
       } else {
@@ -428,8 +496,17 @@ export default function AudioReader() {
           setTimeout(() => {
             setCurrentChunkIndex(0);
             setIsPlaying(true);
-            const params = { text: chapterText, voice: selectedVoice, speed };
-            setLastGeneration(params);
+            const generationId = Date.now().toString();
+            setCurrentGenerationId(generationId);
+            
+            const params = { 
+              type: "generate",
+              text: chapterText, 
+              voice: selectedVoice, 
+              speed,
+              generationId
+            };
+            setLastGeneration({ text: chapterText, voice: selectedVoice, speed });
             setStatus("generating");
             worker.current?.postMessage(params);
           }, 200);
@@ -466,8 +543,17 @@ export default function AudioReader() {
           setTimeout(() => {
             setCurrentChunkIndex(0);
             setIsPlaying(true);
-            const params = { text: chapterText, voice: selectedVoice, speed };
-            setLastGeneration(params);
+            const generationId = Date.now().toString();
+            setCurrentGenerationId(generationId);
+            
+            const params = { 
+              type: "generate",
+              text: chapterText, 
+              voice: selectedVoice, 
+              speed,
+              generationId
+            };
+            setLastGeneration({ text: chapterText, voice: selectedVoice, speed });
             setStatus("generating");
             worker.current?.postMessage(params);
           }, 200);
@@ -502,8 +588,17 @@ export default function AudioReader() {
           setTimeout(() => {
             setCurrentChunkIndex(0);
             setIsPlaying(true);
-            const params = { text: prevPage.text, voice: selectedVoice, speed };
-            setLastGeneration(params);
+            const generationId = Date.now().toString();
+            setCurrentGenerationId(generationId);
+            
+            const params = { 
+              type: "generate",
+              text: prevPage.text, 
+              voice: selectedVoice, 
+              speed,
+              generationId
+            };
+            setLastGeneration({ text: prevPage.text, voice: selectedVoice, speed });
             setStatus("generating");
             worker.current?.postMessage(params);
           }, 200);
@@ -533,8 +628,17 @@ export default function AudioReader() {
           setTimeout(() => {
             setCurrentChunkIndex(0);
             setIsPlaying(true);
-            const params = { text: nextPage.text, voice: selectedVoice, speed };
-            setLastGeneration(params);
+            const generationId = Date.now().toString();
+            setCurrentGenerationId(generationId);
+            
+            const params = { 
+              type: "generate",
+              text: nextPage.text, 
+              voice: selectedVoice, 
+              speed,
+              generationId
+            };
+            setLastGeneration({ text: nextPage.text, voice: selectedVoice, speed });
             setStatus("generating");
             worker.current?.postMessage(params);
           }, 200);
@@ -833,7 +937,7 @@ export default function AudioReader() {
               )}
 
               {/* Currently Playing Text Display */}
-              {chunks.length > 0 && currentChunkIndex >= 0 && currentChunkIndex < chunks.length && (
+              {chunks.length > 0 && currentChunkIndex >= 0 && currentChunkIndex < chunks.length && chunks[currentChunkIndex] && (
                 <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-white rounded-lg border">
                   <div className="text-xs sm:text-sm font-medium text-gray-600 mb-2">Currently Reading:</div>
                   <div className="text-sm sm:text-lg text-gray-800 leading-relaxed">
@@ -984,11 +1088,12 @@ export default function AudioReader() {
               {/* Hidden AudioChunk components for original streaming functionality */}
               {chunks.length > 0 && (
                 <div className="hidden">
-                  {chunks.map(({ text, audio }, index) => (
+                  {chunks.map((chunk, index) => 
+                    chunk ? (
                     <AudioChunk
                       key={index}
-                      text={text}
-                      audio={audio}
+                      text={chunk.text}
+                      audio={chunk.audio}
                       onClick={() => {
                         setCurrentChunkIndex(index);
                       }}
@@ -1004,11 +1109,21 @@ export default function AudioReader() {
                         }
                       }}
                       onEnd={() => {
-                        // No more chunks are still generating, and we have reached the end
-                        if (
-                          status !== "generating" &&
-                          currentChunkIndex === chunks.length - 1
-                        ) {
+                        // Check if there's a next chunk available
+                        if (currentChunkIndex < chunks.length - 1) {
+                          // Move to next chunk
+                          setCurrentChunkIndex((prev) => prev + 1);
+                          
+                          // Request more chunks if needed (sliding window)
+                          if (currentGenerationId && currentChunkIndex + 1 >= 0) {
+                            worker.current?.postMessage({
+                              type: "request_chunk",
+                              requestChunkIndex: currentChunkIndex + 1,
+                              generationId: currentGenerationId
+                            });
+                          }
+                        } else if (status !== "generating") {
+                          // No more chunks available and generation is complete
                           // Check if we should auto-advance to next section
                           if (fileType === "epub" && epubMetadata && selectedChapter) {
                             const currentChapterIndex = epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter);
@@ -1033,12 +1148,12 @@ export default function AudioReader() {
                           // No next section or not using file, stop playing
                           setIsPlaying(false);
                           setCurrentChunkIndex(-1);
-                        } else {
-                          setCurrentChunkIndex((prev) => prev + 1);
                         }
+                        // If status is still "generating", wait for more chunks
                       }}
                     />
-                  ))}
+                  ) : null
+                  )}
                 </div>
               )}
 
