@@ -6,7 +6,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
 export interface PdfPage {
   pageNumber: number;
-  text: string;
+  // text removed - will be loaded on demand
 }
 
 export interface PdfMetadata {
@@ -34,22 +34,11 @@ export class PdfParser {
     const metadata = await this.pdfDocument.getMetadata();
     const info = metadata.info || {};
     
-    // Extract text from all pages
+    // Create page structure without loading content
     const pages: PdfPage[] = [];
     for (let pageNum = 1; pageNum <= this.pdfDocument.numPages; pageNum++) {
-      const page = await this.pdfDocument.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      
-      // Combine text items into a single string
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
       pages.push({
         pageNumber: pageNum,
-        text: pageText,
       });
     }
 
