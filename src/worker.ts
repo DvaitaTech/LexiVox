@@ -235,13 +235,17 @@ async function handleChunkRequest(requestedIndex: number, generationId: string) 
   // Ignore requests from old generations
   if (generationId !== currentGenerationId) return;
 
+  // Debug logging
+  console.log(`Chunk request: index ${requestedIndex}, buffer size: ${chunkBuffer.length}, complete: ${generationComplete}`);
 
-  // Check if we need to generate more chunks
-  const bufferEnd = chunkBuffer.length - 1;
-  const bufferNeeded = requestedIndex + 5; // Keep 5 chunks ahead
-
-  if (bufferNeeded > bufferEnd && !generationComplete) {
-    const chunksToGenerate = Math.min(5, bufferNeeded - bufferEnd);
+  // Only generate more chunks when we're getting close to the end of the buffer
+  const currentBufferSize = chunkBuffer.length;
+  const chunksRemaining = currentBufferSize - requestedIndex - 1;
+  
+  // Generate more chunks only when we have 2 or fewer chunks remaining ahead
+  if (chunksRemaining <= 2 && !generationComplete) {
+    const chunksToGenerate = Math.min(5, 5 - chunksRemaining);
+    console.log(`Generating ${chunksToGenerate} more chunks (remaining: ${chunksRemaining})`);
     await generateChunksAhead(chunksToGenerate);
   }
 

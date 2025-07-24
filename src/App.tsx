@@ -202,9 +202,9 @@ export default function AudioReader() {
     };
   }, [currentGenerationId]);
 
-  // Request chunks as needed when playback position changes
+  // Request chunks as needed when playback position changes (but not on initial load)
   useEffect(() => {
-    if (currentGenerationId && currentChunkIndex >= 0 && status === "generating") {
+    if (currentGenerationId && currentChunkIndex > 0 && status === "generating") {
       worker.current?.postMessage({
         type: "request_chunk",
         requestChunkIndex: currentChunkIndex,
@@ -1112,13 +1112,14 @@ export default function AudioReader() {
                         // Check if there's a next chunk available
                         if (currentChunkIndex < chunks.length - 1) {
                           // Move to next chunk
-                          setCurrentChunkIndex((prev) => prev + 1);
+                          const nextIndex = currentChunkIndex + 1;
+                          setCurrentChunkIndex(nextIndex);
                           
-                          // Request more chunks if needed (sliding window)
-                          if (currentGenerationId && currentChunkIndex + 1 >= 0) {
+                          // Request more chunks if needed (sliding window) - only when we advance beyond chunk 0
+                          if (currentGenerationId && nextIndex > 0) {
                             worker.current?.postMessage({
                               type: "request_chunk",
-                              requestChunkIndex: currentChunkIndex + 1,
+                              requestChunkIndex: nextIndex,
                               generationId: currentGenerationId
                             });
                           }
