@@ -35,6 +35,8 @@ import type { EpubMetadata } from "./utils/epub-parser";
 import type { PdfMetadata } from "./utils/pdf-parser";
 import { useNavigationSwipe } from "./hooks/useSwipeGesture";
 import { isMobile } from "./utils/mobile-detection";
+import { useMediaSession, useWakeLock } from "./hooks/useMediaSession";
+import { useAudioFocus } from "./hooks/useAudioFocus";
 
 export default function AudioReader() {
   const [text, setText] = useState(
@@ -512,6 +514,94 @@ export default function AudioReader() {
     handlePreviousSection,
     swipeEnabled
   );
+
+  // Get current document title for Media Session
+  const getDocumentTitle = () => {
+    if (fileType === "epub" && epubMetadata) {
+      const chapter = epubMetadata.chapters.find(ch => ch.id === selectedChapter);
+      return chapter ? chapter.label : epubMetadata.title;
+    } else if (fileType === "pdf" && pdfMetadata) {
+      return `Page ${selectedPage} - ${pdfMetadata.title}`;
+    }
+    return "Text to Speech";
+  };
+
+  const getAlbumTitle = () => {
+    if (fileType === "epub" && epubMetadata) {
+      return epubMetadata.title;
+    } else if (fileType === "pdf" && pdfMetadata) {
+      return pdfMetadata.title;
+    }
+    return "LexiVox";
+  };
+
+  // Media Session API for background playback
+  useMediaSession(
+    {
+      title: getDocumentTitle(),
+      artist: selectedVoice ? voices?.[selectedVoice]?.name || "LexiVox" : "LexiVox",
+      album: getAlbumTitle(),
+    },
+    {
+      onPlay: () => {
+        if (currentChunkIndex === -1) {
+          setCurrentChunkIndex(0);
+        }
+        setIsPlaying(true);
+      },
+      onPause: () => setIsPlaying(false),
+      onPreviousTrack: () => {
+        if (chunks.length > 0 && currentChunkIndex > 0) {
+          handlePreviousChunk();
+        } else if (fileType) {
+          handlePreviousSection();
+        }
+      },
+      onNextTrack: () => {
+        if (chunks.length > 0 && currentChunkIndex < chunks.length - 1) {
+          handleNextChunk();
+        } else if (fileType) {
+          handleNextSection();
+        }
+      },
+      onSeekBackward: () => {
+        if (currentChunkIndex > 0) {
+          setCurrentChunkIndex(Math.max(0, currentChunkIndex - 5));
+        }
+      },
+      onSeekForward: () => {
+        if (currentChunkIndex < chunks.length - 1) {
+          setCurrentChunkIndex(Math.min(chunks.length - 1, currentChunkIndex + 5));
+        }
+      },
+    },
+    isPlaying,
+    chunks.length * 5, // Approximate duration (5 seconds per chunk)
+    currentChunkIndex * 5 // Approximate current time
+  );
+
+  // Wake lock to prevent screen sleep during playback
+  useWakeLock(isPlaying);
+
+  // Audio focus handling for interruptions
+  const { resumeAudioContext } = useAudioFocus(isPlaying, {
+    onAudioFocusGain: () => {
+      // Resume playback if it was playing before interruption
+      if (!isPlaying && currentChunkIndex >= 0) {
+        setIsPlaying(true);
+      }
+    },
+    onAudioFocusLossTransient: () => {
+      // Pause temporarily for phone calls, etc.
+      if (isPlaying) {
+        setIsPlaying(false);
+      }
+    },
+    onAudioFocusLossTransientCanDuck: () => {
+      // Lower volume but continue playing (not implemented yet)
+      console.debug('Audio ducking requested');
+    },
+  });
 
   return (
     <>
