@@ -105,7 +105,6 @@ let currentGenerationId: string | null = null;
 let generationStream: any = null;
 let streamIterator: any = null;
 let chunkBuffer: any[] = [];
-let currentPlayIndex = 0;
 let totalEstimatedChunks = 0;
 let generationComplete = false;
 
@@ -132,7 +131,6 @@ async function startGeneration(text: string, voice: any, speed: number, generati
   // Reset state
   currentGenerationId = generationId;
   chunkBuffer = [];
-  currentPlayIndex = 0;
   generationComplete = false;
   totalEstimatedChunks = Math.ceil(text.length / 75);
 
@@ -237,7 +235,6 @@ async function handleChunkRequest(requestedIndex: number, generationId: string) 
   // Ignore requests from old generations
   if (generationId !== currentGenerationId) return;
 
-  currentPlayIndex = requestedIndex;
 
   // Check if we need to generate more chunks
   const bufferEnd = chunkBuffer.length - 1;

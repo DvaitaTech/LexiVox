@@ -1,6 +1,6 @@
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Zap, Cpu, Clock } from "lucide-react";
-import { estimateGenerationTime, formatDuration, type DeviceType } from "@/utils/performance-estimates";
+import { Loader2, Zap, Cpu } from "lucide-react";
+import { estimateGenerationTime, type DeviceType } from "@/utils/performance-estimates";
 import { useEffect, useState } from "react";
 
 interface GenerationProgressProps {
@@ -18,45 +18,10 @@ export function GenerationProgress({
   device,
   textLength = 0
 }: GenerationProgressProps) {
-  const [startTime, setStartTime] = useState<number | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
-
-  useEffect(() => {
-    if (isGenerating && !startTime) {
-      setStartTime(Date.now());
-    } else if (!isGenerating) {
-      setStartTime(null);
-      setElapsedTime(0);
-    }
-  }, [isGenerating, startTime]);
-
-  useEffect(() => {
-    if (!isGenerating || !startTime) return;
-
-    const interval = setInterval(() => {
-      setElapsedTime(Date.now() - startTime);
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [isGenerating, startTime]);
-
   if (!isGenerating) return null;
 
   const progress = totalChunks > 0 ? (currentChunk / totalChunks) * 100 : 0;
   const estimate = device && textLength > 0 ? estimateGenerationTime(textLength, device) : null;
-  
-  // Calculate remaining time based on current progress
-  const getRemainingTime = () => {
-    if (!device || elapsedTime < 1000 || currentChunk === 0) return null;
-    
-    const avgTimePerChunk = elapsedTime / currentChunk;
-    const remainingChunks = Math.max(0, totalChunks - currentChunk);
-    const remainingMs = remainingChunks * avgTimePerChunk;
-    
-    return formatDuration(remainingMs);
-  };
-
-  const remainingTime = getRemainingTime();
 
   return (
     <div className="w-full space-y-3 p-4 bg-gray-50 rounded-lg border">
@@ -90,12 +55,6 @@ export function GenerationProgress({
           <span>
             {currentChunk} of {totalChunks > 0 ? totalChunks : '~' + (estimate?.estimatedChunks || '?')} chunks
           </span>
-          {remainingTime && (
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {remainingTime} remaining
-            </span>
-          )}
         </div>
       </div>
 
