@@ -10,6 +10,7 @@ import {
   SkipForward,
   ChevronLeft,
   ChevronRight,
+  Github,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -495,13 +496,50 @@ export default function AudioReader() {
       <div className="min-h-screen bg-gray-50/50 p-2 sm:p-4 md:p-12">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-4 sm:mb-6">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-2">
-              <div className="hidden sm:block"></div> {/* Spacer for desktop */}
-              <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex flex-col sm:flex-row items-center gap-3 mb-2 sm:relative">
+              {/* Desktop: Absolute positioned buttons on the right */}
+              <div className="hidden sm:flex items-center gap-2 sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  asChild
+                  className="h-8 w-8 sm:h-10 sm:w-10"
+                >
+                  <a
+                    href="https://github.com/DvaitaTech/LexiVox"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="View source on GitHub"
+                  >
+                    <Github className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </a>
+                </Button>
+                <InstallButton />
+              </div>
+              
+              {/* Centered title */}
+              <div className="flex items-center gap-2 sm:gap-3 sm:mx-auto">
                 <AudioWaveform className="size-8 sm:size-10 md:size-12 text-blue-500" />
                 <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-gray-900">LexiVox</h1>
               </div>
-              <div className="sm:block">
+              
+              {/* Mobile: Show buttons below title */}
+              <div className="flex items-center gap-2 sm:hidden">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  asChild
+                  className="h-8 w-8"
+                >
+                  <a
+                    href="https://github.com/DvaitaTech/LexiVox"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="View source on GitHub"
+                  >
+                    <Github className="h-4 w-4" />
+                  </a>
+                </Button>
                 <InstallButton />
               </div>
             </div>
