@@ -6,6 +6,10 @@ import {
   Copy,
   Check,
   AudioWaveform,
+  SkipBack,
+  SkipForward,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -207,6 +211,57 @@ export default function AudioReader() {
     toast.info("EPUB cleared");
   };
 
+  // Navigation functions
+  const handlePreviousChunk = () => {
+    if (currentChunkIndex > 0) {
+      const wasPlaying = isPlaying;
+      setIsPlaying(false); // Briefly stop to reset audio
+      setCurrentChunkIndex(currentChunkIndex - 1);
+      if (wasPlaying) {
+        // Resume playing from new position
+        setTimeout(() => setIsPlaying(true), 100);
+      }
+    }
+  };
+
+  const handleNextChunk = () => {
+    if (currentChunkIndex < chunks.length - 1) {
+      const wasPlaying = isPlaying;
+      setIsPlaying(false); // Briefly stop to reset audio
+      setCurrentChunkIndex(currentChunkIndex + 1);
+      if (wasPlaying) {
+        // Resume playing from new position
+        setTimeout(() => setIsPlaying(true), 100);
+      }
+    }
+  };
+
+  const handlePreviousChapter = async () => {
+    if (!epubMetadata || !selectedChapter) return;
+    
+    const currentChapterIndex = epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter);
+    if (currentChapterIndex > 0) {
+      const wasPlaying = isPlaying;
+      setIsPlaying(false); // Stop current playback
+      const prevChapter = epubMetadata.chapters[currentChapterIndex - 1];
+      await handleChapterSelect(prevChapter.id, wasPlaying); // Pass playing state
+      setCurrentChunkIndex(0);
+    }
+  };
+
+  const handleNextChapter = async () => {
+    if (!epubMetadata || !selectedChapter) return;
+    
+    const currentChapterIndex = epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter);
+    if (currentChapterIndex < epubMetadata.chapters.length - 1) {
+      const wasPlaying = isPlaying;
+      setIsPlaying(false); // Stop current playback
+      const nextChapter = epubMetadata.chapters[currentChapterIndex + 1];
+      await handleChapterSelect(nextChapter.id, wasPlaying); // Pass playing state
+      setCurrentChunkIndex(0);
+    }
+  };
+
   return (
     <>
       <div className="min-h-screen bg-gray-50/50 p-4 md:p-12">
@@ -327,51 +382,101 @@ export default function AudioReader() {
 
               <Separator />
 
-              <div className="flex py-4 gap-4">
-                <Button
-                  size="lg"
-                  onClick={handlePlayPause}
-                  className={cn(
-                    "text-lg w-36 transition-all",
-                    isPlaying && "bg-orange-600 hover:bg-orange-700",
-                  )}
-                  disabled={
-                    (status === "ready" && !isPlaying && !text) ||
-                    (status !== "ready" && chunks.length === 0)
-                  }
-                >
-                  {isPlaying ? (
-                    <>
-                      <Pause className="mr-1 size-8" />
-                      Pause
-                    </>
-                  ) : (
-                    <>
-                      <Play className="mr-1 size-8" />
-                      {processed || status === "generating"
-                        ? "Play"
-                        : "Generate"}
-                    </>
-                  )}
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => {
-                    if (!result) return;
-                    const url = URL.createObjectURL(result);
-                    const link = document.createElement("a");
-                    link.href = url;
-                    link.download = "audio.wav";
-                    link.click();
-                    URL.revokeObjectURL(url);
-                  }}
-                  disabled={!result || status !== "ready"}
-                  className="ml-auto"
-                >
-                  <Download className="mr-2 size-6" />
-                  Download Audio
-                </Button>
+              {/* Media Player Controls */}
+              <div className="py-6">
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  {/* Chapter Navigation */}
+                  <Button
+                    size="lg"
+                    variant="ghost"
+                    onClick={handlePreviousChapter}
+                    disabled={
+                      !epubMetadata || 
+                      !selectedChapter || 
+                      epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter) === 0
+                    }
+                    className="h-12 w-12"
+                  >
+                    <ChevronLeft className="size-6" />
+                  </Button>
+
+                  {/* Chunk Navigation */}
+                  <Button
+                    size="lg"
+                    variant="ghost"
+                    onClick={handlePreviousChunk}
+                    disabled={currentChunkIndex <= 0 || chunks.length === 0}
+                    className="h-12 w-12"
+                  >
+                    <SkipBack className="size-5" />
+                  </Button>
+
+                  {/* Play/Pause */}
+                  <Button
+                    size="lg"
+                    onClick={handlePlayPause}
+                    className={cn(
+                      "h-16 w-16 rounded-full text-lg transition-all",
+                      isPlaying && "bg-orange-600 hover:bg-orange-700",
+                    )}
+                    disabled={
+                      (status === "ready" && !isPlaying && !text) ||
+                      (status !== "ready" && chunks.length === 0)
+                    }
+                  >
+                    {isPlaying ? (
+                      <Pause className="size-8" />
+                    ) : (
+                      <Play className="size-8 ml-1" />
+                    )}
+                  </Button>
+
+                  {/* Chunk Navigation */}
+                  <Button
+                    size="lg"
+                    variant="ghost"
+                    onClick={handleNextChunk}
+                    disabled={currentChunkIndex >= chunks.length - 1 || chunks.length === 0}
+                    className="h-12 w-12"
+                  >
+                    <SkipForward className="size-5" />
+                  </Button>
+
+                  {/* Chapter Navigation */}
+                  <Button
+                    size="lg"
+                    variant="ghost"
+                    onClick={handleNextChapter}
+                    disabled={
+                      !epubMetadata || 
+                      !selectedChapter || 
+                      epubMetadata.chapters.findIndex(ch => ch.id === selectedChapter) === epubMetadata.chapters.length - 1
+                    }
+                    className="h-12 w-12"
+                  >
+                    <ChevronRight className="size-6" />
+                  </Button>
+                </div>
+
+                {/* Secondary Controls */}
+                <div className="flex items-center justify-center gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (!result) return;
+                      const url = URL.createObjectURL(result);
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = "audio.wav";
+                      link.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    disabled={!result || status !== "ready"}
+                  >
+                    <Download className="mr-2 size-4" />
+                    Download
+                  </Button>
+                </div>
               </div>
 
               {/* Hidden AudioChunk components for original streaming functionality */}
